@@ -1,10 +1,13 @@
+use std::time::Instant;
+
 use tokio_postgres::{Client, Error, NoTls};
-use chrono::{DateTime, Utc};
+use chrono::{Date, DateTime, Utc};
 use crate::tennet::{parse_tennet_time_stamp, BalanceDeltaPoint};
 use rust_decimal_macros::dec;
 use rust_decimal::prelude::*;
+use serde::Serialize;
 
-pub async fn setup_db (balance_delta: &Vec<BalanceDeltaPoint>) -> Result<(), Error> {
+pub async fn setup_db (balance_delta: &Vec<BalanceDeltaPoint>) -> Result<Client, Error> {
 
     let (
         client,
@@ -24,7 +27,9 @@ pub async fn setup_db (balance_delta: &Vec<BalanceDeltaPoint>) -> Result<(), Err
 
     insert_balance_delta(&client, balance_delta).await?;
 
-    Ok(())
+    // get_balance_delta(&client).await?;
+
+    Ok(client)
 }
 
 pub async fn create_balance_delta_table (client: &Client) -> Result<(), Error> {
@@ -62,7 +67,6 @@ fn parse_some_f64 (str: &Option<String>) -> Option<Decimal> {
 }
 
 pub async fn insert_balance_delta (client: &Client, balance_delta: &Vec<BalanceDeltaPoint>) -> Result<(), Error> {
-
 
     for delta in balance_delta {
 
@@ -115,4 +119,67 @@ pub async fn insert_balance_delta (client: &Client, balance_delta: &Vec<BalanceD
     }
 
     Ok(())
+}
+
+pub async fn get_balance_delta (client: &Client, from: &DateTime<Utc>, to: &DateTime<Utc>) -> Result<Vec<BalanceDelta>, Error> {
+
+    let before = Instant::now();
+
+    let query = client.query(
+        "
+            SELECT * FROM balance_delta
+            WHERE time_stamp >= $1
+            AND time_stamp <= $2
+            ORDER BY time_stamp ASC
+        ",
+        &[
+            from,
+            to,
+            // &DateTime::<Utc>::from_str("2024-08-27T22:00:00Z").unwrap(),
+            // &DateTime::<Utc>::from_str("2024-08-27T22:05:00Z").unwrap(),
+        ]
+    ).await?;
+
+    let mut balance_delta_vec = vec![];
+
+    for row in query {
+        let balance_delta = BalanceDelta {
+            time_stamp: row.get(0),
+            power_afrr_in: row.get(1),
+            power_afrr_out: row.get(2),
+            power_igcc_in: row.get(3),
+            power_igcc_out: row.get(4),
+            power_mfrrda_in: row.get(5),
+            power_mfrrda_out: row.get(6),
+            power_picasso_in: row.get(7),
+            power_picasso_out: row.get(8),
+            max_upw_regulation_price: row.get(9),
+            min_downw_regulation_price: row.get(10),
+            mid_price: row.get(11),
+        };
+
+        balance_delta_vec.push(balance_delta)
+    }
+
+    println!("Query took: {:.2?}", before.elapsed());
+
+    println!("{:#?}", balance_delta_vec);
+
+    Ok(balance_delta_vec)
+}
+
+#[derive(Debug, Serialize)]
+pub struct BalanceDelta {
+    pub time_stamp: DateTime<Utc>,
+    pub power_afrr_in: Decimal,
+    pub power_afrr_out: Decimal,
+    pub power_igcc_in: Decimal,
+    pub power_igcc_out: Decimal,
+    pub power_mfrrda_in: Decimal,
+    pub power_mfrrda_out: Decimal,
+    pub power_picasso_in: Option<Decimal>,
+    pub power_picasso_out: Option<Decimal>,
+    pub max_upw_regulation_price: Option<Decimal>,
+    pub min_downw_regulation_price: Option<Decimal>,
+    pub mid_price: Decimal,
 }

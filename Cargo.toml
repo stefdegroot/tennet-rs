@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.0", features = ["full",  "tracing", "macros", "time"] }
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = "0.10"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -15,3 +15,4 @@ tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"] }
 regex = "1"
 rust_decimal = { version = "1.36", features = ["db-tokio-postgres"] }
 rust_decimal_macros = "1.36"
+axum = { version = "0.7", features = ["macros", "json"] }

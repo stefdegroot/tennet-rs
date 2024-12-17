@@ -1,9 +1,7 @@
 use std::time::Instant;
-
 use tokio_postgres::{Client, Error, NoTls};
-use chrono::{Date, DateTime, Utc};
-use crate::tennet::{parse_tennet_time_stamp, BalanceDeltaPoint};
-use rust_decimal_macros::dec;
+use chrono::{DateTime, Utc};
+use crate::tennet::{balance_delta::BalanceDeltaPoint, time::parse_tennet_time_stamp};
 use rust_decimal::prelude::*;
 use serde::Serialize;
 
@@ -24,10 +22,6 @@ pub async fn setup_db (balance_delta: &Vec<BalanceDeltaPoint>) -> Result<Client,
     });
 
     create_balance_delta_table(&client).await?;
-
-    insert_balance_delta(&client, balance_delta).await?;
-
-    // get_balance_delta(&client).await?;
 
     Ok(client)
 }
@@ -68,8 +62,9 @@ fn parse_some_f64 (str: &Option<String>) -> Option<Decimal> {
 
 pub async fn insert_balance_delta (client: &Client, balance_delta: &Vec<BalanceDeltaPoint>) -> Result<(), Error> {
 
-    for delta in balance_delta {
+    let mut inserted_rows = 0;
 
+    for delta in balance_delta {
         client.execute(
             r#"
                 INSERT INTO balance_delta (
@@ -87,20 +82,6 @@ pub async fn insert_balance_delta (client: &Client, balance_delta: &Vec<BalanceD
                     mid_price
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             "#,
-            // &[
-            //     &parse_tennet_time_stamp(&delta.time_interval_start),
-            //     &delta.power_afrr_in.parse::<f64>().unwrap(),
-            //     &delta.power_afrr_out.parse::<f64>().unwrap(),
-            //     &delta.power_igcc_in.parse::<f64>().unwrap(),
-            //     &delta.power_igcc_out.parse::<f64>().unwrap(),
-            //     &delta.power_mfrrda_in.parse::<f64>().unwrap(),
-            //     &delta.power_mfrrda_out.parse::<f64>().unwrap(),
-            //     &parse_some_f64(&delta.power_picasso_in),
-            //     &parse_some_f64(&delta.power_picasso_out),
-            //     &parse_some_f64(&delta.max_upw_regulation_price),
-            //     &parse_some_f64(&delta.min_downw_regulation_price),
-            //     &delta.mid_price.parse::<f64>().unwrap(),
-            // ]
             &[
                 &parse_tennet_time_stamp(&delta.time_interval_start),
                 &Decimal::from_str(&delta.power_afrr_in).unwrap(),
@@ -116,7 +97,11 @@ pub async fn insert_balance_delta (client: &Client, balance_delta: &Vec<BalanceD
                 &Decimal::from_str(&delta.mid_price).unwrap(),
             ]
         ).await?;
+
+        inserted_rows += 1;
     }
+
+    println!("inserted {} rows into the balance_delta table", inserted_rows);
 
     Ok(())
 }
@@ -135,8 +120,6 @@ pub async fn get_balance_delta (client: &Client, from: &DateTime<Utc>, to: &Date
         &[
             from,
             to,
-            // &DateTime::<Utc>::from_str("2024-08-27T22:00:00Z").unwrap(),
-            // &DateTime::<Utc>::from_str("2024-08-27T22:05:00Z").unwrap(),
         ]
     ).await?;
 
@@ -166,6 +149,25 @@ pub async fn get_balance_delta (client: &Client, from: &DateTime<Utc>, to: &Date
     println!("{:#?}", balance_delta_vec);
 
     Ok(balance_delta_vec)
+}
+
+pub async fn get_latest_balance_delta (client: &Client) -> Result<Option<DateTime<Utc>>, Error> {
+
+    let query = client.query("
+       SELECT time_stamp FROM balance_delta
+       ORDER BY time_stamp DESC
+       LIMIT 1
+    ", &[]).await?;
+
+    let mut last_time_stamp: Option<DateTime<Utc>> = None;
+
+    for row in query {
+        last_time_stamp = Some(row.get(0))
+    }
+
+    println!("last_time_stamp: {:#?}", last_time_stamp);
+
+    Ok(last_time_stamp)
 }
 
 #[derive(Debug, Serialize)]

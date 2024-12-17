@@ -1,36 +1,50 @@
-use std::{os::windows::process, str::FromStr, time::SystemTime};
+use std::str::FromStr;
 use chrono::{Timelike, Utc, DateTime};
 use db::BalanceDelta;
 use serde::Serialize;
-use tokio::time::{self, sleep, Duration, Instant};
+use tennet::TennetApi;
+use sync::sync_service;
+use tokio::signal;
 use tokio_postgres::Client;
 use std::collections::HashMap;
 use std::sync::Arc;
 use axum::{
-    extract::{rejection::{self, JsonDataError, JsonRejection}, FromRequest, Query, State}, http::StatusCode, response::{ErrorResponse, IntoResponse, Response}, routing::{get, post}, Error, Json, Router
+    extract::{rejection::JsonRejection, FromRequest, Query, State},
+    http::StatusCode, response::{IntoResponse, Response},
+    routing::get,
+    Router
 };
+use dotenv::dotenv;
 
 mod tennet;
 mod db;
+mod sync;
 
 #[derive(Clone)]
-struct AppState {
+pub struct AppState {
     db_client: Arc<Client>,
+    tennet_api: Arc<TennetApi>,
 }
 
 #[tokio::main]
 async fn main() {
 
+    dotenv().ok();
+
     let db_client = db::setup_db(&vec![]).await.expect("Failed to setup database client.");
+
+    let tennet_api = tennet::TennetApi::init();
     
     let app_state = AppState {
         db_client: Arc::new(db_client),
+        tennet_api: Arc::new(tennet_api),
     };
 
     let app = Router::new()
         .route("/balance-delta", get(get_balance_delta))
-        .with_state(app_state);
+        .with_state(app_state.clone());
 
+    sync_service(app_state.clone());
 
     // let utc = Utc::now();
 
@@ -86,7 +100,10 @@ async fn main() {
     // }
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .unwrap();
 
 }
 
@@ -138,6 +155,17 @@ async fn get_balance_delta (
         }
     };
 
+    // let _ = state.tennet_api.get_balance_delta(date_from, date_to).await;
+    // match state.tennet_api.get_merit_order_list(date_from, date_to).await {
+    // match state.tennet_api.get_settlement_prices(date_from, date_to).await {
+    //     Ok(r) => {
+    //         println!("success");
+    //     },
+    //     Err(err) => {
+    //         println!("{:#?}", err);
+    //     }
+    // }
+
     return Ok(AppJson(data));
 }
 
@@ -183,5 +211,30 @@ impl IntoResponse for AppError {
 impl From<JsonRejection> for AppError {
     fn from(rejection: JsonRejection) -> Self {
         Self::JsonRejection(rejection)
+    }
+}
+
+async fn shutdown_signal () {
+
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+c handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
     }
 }

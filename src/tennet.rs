@@ -1,34 +1,26 @@
-use reqwest;
-use reqwest::{Url, header};
-use serde::Deserialize;
-use anyhow::{Error, Result};
-use regex::Regex;
-use chrono::{TimeZone, DateTime, Utc};
-use chrono_tz::Europe::Amsterdam;
+use std::env;
+use reqwest::{Client, header, Url};
+use serde::{Deserialize, de::DeserializeOwned};
+use anyhow::Result;
+use balance_delta::BalanceDeltaPoint;
+use merit_order_list::MeritOrderList;
+use settlement_prices::SettlementPrices;
+use chrono::{DateTime, Utc};
 
-#[derive(Deserialize, Debug)]
-pub struct BalanceDeltaPoint {
-    #[serde(rename="timeInterval_start")]
-    pub time_interval_start: String,
-    #[serde(rename="timeInterval_end")]
-    pub time_interval_end: String,
-    pub sequence: String,
-    pub power_afrr_in: String,
-    pub power_afrr_out: String,
-    pub power_igcc_in: String,
-    pub power_igcc_out: String,
-    pub power_mfrrda_in: String,
-    pub power_mfrrda_out: String,
-    pub power_picasso_in: Option<String>,
-    pub power_picasso_out: Option<String>,
-    pub max_upw_regulation_price: Option<String>,
-    pub min_downw_regulation_price: Option<String>,
-    pub mid_price: String,
+pub mod balance_delta;
+pub mod merit_order_list;
+pub mod settlement_prices;
+pub mod time;
+
+pub struct TennetApi {
+    api_key: String,
+    base_url: String,
+    client: Client,
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
 pub struct TimeSeriesPeriod <T> {
+    #[serde(rename="timeInterval")]
     time_interval: PeriodTimeInterval,
     #[serde(rename="Points")]
     pub points: Vec<T>
@@ -39,7 +31,9 @@ pub struct TimeSeries <T> {
     #[serde(rename="mRID")]
     m_rid: i64,
     #[serde(rename="quantity_Measurement_Unit_name")]
-    quantity_measurement_unit_name: String,
+    quantity_measurement_unit_name: Option<String>,
+    #[serde(rename="price_Measurement_Unit_name")]
+    price_measurement_unit_name: Option<String>,
     #[serde(rename="currency_Unit_name")]
     currency_unit_name: String,
     #[serde(rename="Period")]
@@ -47,88 +41,105 @@ pub struct TimeSeries <T> {
 }
 
 #[derive(Deserialize, Debug)]
-// #[serde(rename_all = "camelCase")]
 pub struct PeriodTimeInterval {
     start: String,
     end: String,
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct BalanceDeltaResponse {
+pub struct TennetResponseInfo<T> {
+    #[serde(rename="informationType")]
     information_type: String,
     #[serde(rename="period.timeInterval")]
     period_time_interval: PeriodTimeInterval,
     #[serde(rename="TimeSeries")]
-    pub time_series: Vec<TimeSeries<BalanceDeltaPoint>>,
+    pub time_series: Vec<TimeSeries<T>>,
 }
 
 #[derive(Deserialize, Debug)]
-// #[serde(rename_all = "camelCase")]
 pub struct TennetResponse <T> {
     #[serde(rename="Response")]
-    pub response: T
+    pub response: TennetResponseInfo<T>
 }
 
-pub async fn get_balance_delta () -> Result<TennetResponse<BalanceDeltaResponse>> {
+impl TennetApi {
+    pub fn init () -> Self {
 
-    let api_key = "";
-    let base_url = "https://api.tennet.eu/publications";
-    let path = "/v1/balance-delta";
+        let api_key = env::var("TENNET_API_KEY")
+            .expect("Tennet api key missing from enviroment variables.");
 
-    let date_from = "28-8-2024 00:00:00";
-    let date_to = "28-8-2024 00:15:00";
+        let base_url = env::var("TENNET_API_URL")
+            .expect("Tennet base url missing from enviroment variables.");
 
-    let query = format!("?date_from={date_from}&date_to={date_to}");
+        let client = reqwest::Client::builder()
+            .https_only(true)
+            .use_rustls_tls()
+            .build()
+            .expect("Failed to create reqwest client.");
 
+        TennetApi {
+            api_key,
+            base_url,
+            client,
+        }
+    }
 
-    let url = Url::parse_with_params(
-        &format!("{base_url}{path}"),
-        &[
-            ("date_from", date_from),
-            ("date_to", date_to),
-        ]
-    )?;
+    async fn request <R: DeserializeOwned> (&self, route: &str, params: &[(&str, &str)]) -> Result<TennetResponse<R>> {
 
-    println!("{:?}", url);
+        let url = Url::parse_with_params(
+            &format!("{}{}", self.base_url, route),
+            params
+        )?;
 
-    let response = reqwest::Client::builder()
-        .https_only(true)
-        .use_rustls_tls()
-        .build()?
-        .get(url)
-        .header("apikey", api_key)
-        .header(header::ACCEPT, "application/json")
-        .header(header::USER_AGENT, "Rust-test-agent")
-        .send()
-        .await?
-        // .text()
-        .json::<TennetResponse<BalanceDeltaResponse>>()
-        .await?;
+        let response = self.client
+            .get(url)
+            .header("apikey", &self.api_key)
+            .header(header::ACCEPT, "application/json")
+            .send()
+            .await?
+            .json::<TennetResponse<R>>()
+            .await?;
 
+        Ok(response)
+    }
 
-    println!("{:#?}", response);
+    pub async fn get_balance_delta (&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Result<TennetResponse<BalanceDeltaPoint>> {
 
-    Ok(response)
+        let response = self.request::<BalanceDeltaPoint>(
+            "/v1/balance-delta",
+            &[
+                ("date_from", &time::create_tennet_time_stamp(from)),
+                ("date_to", &time::create_tennet_time_stamp(to)),
+            ]
+        ).await?;
+
+        Ok(response)
+    }
+
+    pub async fn get_merit_order_list (&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Result<TennetResponse<MeritOrderList>> {
+
+        let response = self.request::<MeritOrderList>(
+            "/v1/merit-order-list",
+            &[
+                ("date_from", &time::create_tennet_time_stamp(from)),
+                ("date_to", &time::create_tennet_time_stamp(to)),
+            ]
+        ).await?;
+
+        Ok(response)
+    }
+
+    pub async fn get_settlement_prices (&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Result<TennetResponse<SettlementPrices>> {
+
+        let response = self.request::<SettlementPrices>(
+            "/v1/settlement-prices",
+            &[
+                ("date_from", &time::create_tennet_time_stamp(from)),
+                ("date_to", &time::create_tennet_time_stamp(to)),
+            ]
+        ).await?;
+
+        Ok(response)
+    }
 }
 
-// TODO: add proper Error handeling
-pub fn parse_tennet_time_stamp (time_string: &str) -> DateTime<Utc> {
-
-    let re = Regex::new(r"([0-9]+)-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2})").unwrap();
-
-    let caps = re.captures(time_string).unwrap();
-
-    let year = caps.get(1).unwrap().as_str().parse::<i32>().unwrap();
-    let month = caps.get(2).unwrap().as_str().parse::<u32>().unwrap();
-    let day = caps.get(3).unwrap().as_str().parse::<u32>().unwrap();
-    let hour = caps.get(4).unwrap().as_str().parse::<u32>().unwrap();
-    let min = caps.get(5).unwrap().as_str().parse::<u32>().unwrap();
-
-    println!("{year}-{month}-{day}T{hour}:{min}");
-
-    let amsterdam_time = Amsterdam.with_ymd_and_hms(year, month, day, hour, min, 0).unwrap();
-    let utc = amsterdam_time.to_utc();
-
-    return utc;
-}

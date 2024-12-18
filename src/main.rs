@@ -3,6 +3,7 @@ use chrono::{Timelike, Utc, DateTime};
 use db::BalanceDelta;
 use serde::Serialize;
 use tennet::TennetApi;
+use notification::MQTT;
 use sync::sync_service;
 use tokio::signal;
 use tokio_postgres::Client;
@@ -19,11 +20,13 @@ use dotenv::dotenv;
 mod tennet;
 mod db;
 mod sync;
+mod notification;
 
 #[derive(Clone)]
 pub struct AppState {
     db_client: Arc<Client>,
     tennet_api: Arc<TennetApi>,
+    mqtt_client: Arc<MQTT>,
 }
 
 #[tokio::main]
@@ -34,10 +37,14 @@ async fn main() {
     let db_client = db::setup_db(&vec![]).await.expect("Failed to setup database client.");
 
     let tennet_api = tennet::TennetApi::init();
+
+    let mqtt_client = MQTT::init();
+
     
     let app_state = AppState {
         db_client: Arc::new(db_client),
         tennet_api: Arc::new(tennet_api),
+        mqtt_client: Arc::new(mqtt_client),
     };
 
     let app = Router::new()

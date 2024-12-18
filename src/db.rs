@@ -1,19 +1,22 @@
 use std::time::Instant;
+use axum::response::IntoResponse;
+use bincode::ErrorKind;
 use tokio_postgres::{Client, Error, NoTls};
 use chrono::{DateTime, Utc};
 use crate::tennet::{balance_delta::BalanceDeltaPoint, time::parse_tennet_time_stamp};
 use rust_decimal::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub async fn setup_db (balance_delta: &Vec<BalanceDeltaPoint>) -> Result<Client, Error> {
 
-    let (
-        client,
-        connection
-    ) = tokio_postgres::connect(
+    let connect = tokio_postgres::connect(
         "host=localhost user=admin password=root dbname=test_db", 
         NoTls
     ).await?;
+    let (
+        client,
+        connection
+    ) = connect;
 
     tokio::spawn(async move {
         if let Err(e) = connection.await {
@@ -170,7 +173,7 @@ pub async fn get_latest_balance_delta (client: &Client) -> Result<Option<DateTim
     Ok(last_time_stamp)
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BalanceDelta {
     pub time_stamp: DateTime<Utc>,
     pub power_afrr_in: Decimal,
@@ -184,4 +187,28 @@ pub struct BalanceDelta {
     pub max_upw_regulation_price: Option<Decimal>,
     pub min_downw_regulation_price: Option<Decimal>,
     pub mid_price: Decimal,
+}
+
+// impl From<BalanceDelta> for Vec<u8> {
+//     fn from(value: BalanceDelta) -> Self {
+//         bincode::serialize(&value).unwrap()
+//     }
+// }
+
+// impl From<&BalanceDelta> for Vec<u8> {
+//     fn from(value: &BalanceDelta) -> Self {
+//         bincode::serialize(value).unwrap()
+//     }
+// }
+
+impl From<BalanceDelta> for String {
+    fn from(value: BalanceDelta) -> Self {
+        serde_json::ser::to_string(&value).unwrap()
+    }
+}
+
+impl From<&BalanceDelta> for String {
+    fn from(value: &BalanceDelta) -> Self {
+        serde_json::ser::to_string(value).unwrap()
+    }
 }

@@ -8,7 +8,7 @@ Imbalance market data service on top of the Tennet Publication API.
 
 ### Data sources
 
-**/api.tennet.eu/publications**
+**api.tennet.eu/publications**
 - [x] Balance Delta
 - [x] Merit Order List
 - [x] Settlement Prices

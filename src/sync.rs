@@ -3,7 +3,7 @@ use tokio::{
     task,
     time::{sleep, Duration}
 };
-use crate::AppState;
+use crate::{db::get_balance_delta, AppState};
 use crate::db::{
     get_latest_balance_delta,
     insert_balance_delta,
@@ -47,7 +47,15 @@ fn balance_delta_service (app_state: AppState) {
                 &app_state.db_client,
                 &result.response.time_series[0].period.points,
             ).await.unwrap();
+
+            let latest = get_balance_delta(&app_state.db_client, &from, &to).await.unwrap();
+
+            if let Some(delta) = latest.last() {
+                app_state.mqtt_client.publish("tennet/balance-delta", delta.into()).await;
+            };
         }
+
+
     });
 }
 

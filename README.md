@@ -26,7 +26,7 @@ Imbalance market data service on top of the Tennet Publication API.
 
 ### Local development
 
-Setup local Postgres instance. ([external docs](https://medium.com/@jewelski/quickly-set-up-a-local-postgres-database-using-docker-5098052a4726))
+Setup local Postgres instance ([external docs](https://medium.com/@jewelski/quickly-set-up-a-local-postgres-database-using-docker-5098052a4726)) and MQTT broker.
 
 ```shell
 docker-compose up -d

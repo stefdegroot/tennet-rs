@@ -26,5 +26,18 @@ services:
       PGADMIN_DEFAULT_PASSWORD: root
     restart: unless-stopped
 
+  mosquitto:
+    container_name: mosquitto
+    image: eclipse-mosquitto
+    hostname: mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - type: bind
+        source: "/c/Users/stefd/Documenten/Code/rust/tennet/mosquitto"
+        target: /mosquitto/config
+    restart: unless-stopped
+
 volumes:
   postgres-data:

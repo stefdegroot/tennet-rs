@@ -2,7 +2,7 @@ use std::time::Duration;
 use rumqttc::v5::{mqttbytes::QoS, AsyncClient, MqttOptions};
 use tokio::task;
 
-use crate::db::BalanceDelta;
+// use crate::db::BalanceDelta;
 
 pub struct MQTT {
     client: AsyncClient
@@ -27,10 +27,10 @@ impl MQTT {
                 let event = eventloop.poll().await;
                 match &event {
                     Ok(v) => {
-                        println!("Event = {v:?}");
+                        // println!("Event = {v:?}");
                     }
                     Err(e) => {
-                        println!("Error = {e:?}");
+                        // println!("Error = {e:?}");
                     }
                 }
             }

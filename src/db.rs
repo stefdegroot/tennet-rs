@@ -1,214 +1,222 @@
-use std::time::Instant;
-use axum::response::IntoResponse;
-use bincode::ErrorKind;
-use tokio_postgres::{Client, Error, NoTls};
-use chrono::{DateTime, Utc};
-use crate::tennet::{balance_delta::BalanceDeltaPoint, time::parse_tennet_time_stamp};
-use rust_decimal::prelude::*;
-use serde::{Deserialize, Serialize};
+// use std::time::Instant;
+// use axum::response::IntoResponse;
+// use tokio_postgres::{Client, Error, NoTls};
+// use chrono::{DateTime, Utc};
+// use crate::tennet::{balance_delta::BalanceDeltaPoint, time::parse_tennet_time_stamp};
+// use rust_decimal::prelude::*;
+// use serde::{Deserialize, Serialize};
+use crate::config::CONFIG;
+use sqlx::{postgres::PgPoolOptions, Execute, Executor, Postgres, Pool, QueryBuilder};
 
-pub async fn setup_db (balance_delta: &Vec<BalanceDeltaPoint>) -> Result<Client, Error> {
+pub mod balance_delta;
 
-    let connect = tokio_postgres::connect(
-        "host=localhost user=admin password=root dbname=test_db", 
-        NoTls
-    ).await?;
-    let (
-        client,
-        connection
-    ) = connect;
+pub async fn setup_db () -> Result<Pool<Postgres>, sqlx::Error> {
 
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("connection error: {}", e);
-        }
-    });
+    let connection_string = format!(
+        "postgres://{}:{}@{}/{}",
+        CONFIG.db.user,
+        CONFIG.db.password,
+        CONFIG.db.host,
+        CONFIG.db.name,
+    );
 
-    create_balance_delta_table(&client).await?;
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&connection_string).await?;
 
-    Ok(client)
+    Ok(pool)
 }
 
-pub async fn create_balance_delta_table (client: &Client) -> Result<(), Error> {
+// pub async fn setup_db (balance_delta: &Vec<BalanceDeltaPoint>) -> Result<Client, Error> {
 
-    client.batch_execute(r#"
-        CREATE TABLE IF NOT EXISTS balance_delta (
-            time_stamp                  TIMESTAMP WITH TIME ZONE NOT NULL PRIMARY KEY,
-            power_afrr_in               DECIMAL NOT NULL,
-            power_afrr_out              DECIMAL NOT NULL,
-            power_igcc_in               DECIMAL NOT NULL,
-            power_igcc_out              DECIMAL NOT NULL,
-            power_mfrrda_in             DECIMAL NOT NULL,
-            power_mfrrda_out            DECIMAL NOT NULL,
-            power_picasso_in            DECIMAL,
-            power_picasso_out           DECIMAL,
-            max_upw_regulation_price    DECIMAL,
-            min_downw_regulation_price  DECIMAL,
-            mid_price                   DECIMAL NOT NULL
-        );
-        CREATE INDEX IF NOT EXISTS balance_delta_time_stamp ON balance_delta (time_stamp);
-    "#).await?;
+//     let connect = tokio_postgres::connect(
+//         "host=localhost user=admin password=root dbname=test_db", 
+//         NoTls
+//     ).await?;
+//     let (
+//         client,
+//         connection
+//     ) = connect;
 
-    Ok(())
-}
+//     tokio::spawn(async move {
+//         if let Err(e) = connection.await {
+//             eprintln!("connection error: {}", e);
+//         }
+//     });
 
-fn parse_some_f64 (str: &Option<String>) -> Option<Decimal> {
-    if let Some(string) = str {
-        match Decimal::from_str(&string) {
-            Ok(decimal) => Some(decimal),
-            Err(_) => None,
-        }
-    } else {
-        None
-    }
-}
+//     create_balance_delta_table(&client).await?;
 
-pub async fn insert_balance_delta (client: &Client, balance_delta: &Vec<BalanceDeltaPoint>) -> Result<(), Error> {
+//     Ok(client)
+// }
 
-    let mut inserted_rows = 0;
+// pub async fn create_balance_delta_table (client: &Client) -> Result<(), Error> {
 
-    for delta in balance_delta {
-        client.execute(
-            r#"
-                INSERT INTO balance_delta (
-                    time_stamp,
-                    power_afrr_in,
-                    power_afrr_out,
-                    power_igcc_in,
-                    power_igcc_out,
-                    power_mfrrda_in,
-                    power_mfrrda_out,
-                    power_picasso_in,
-                    power_picasso_out,
-                    max_upw_regulation_price,
-                    min_downw_regulation_price,
-                    mid_price
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            "#,
-            &[
-                &parse_tennet_time_stamp(&delta.time_interval_start),
-                &Decimal::from_str(&delta.power_afrr_in).unwrap(),
-                &Decimal::from_str(&delta.power_afrr_out).unwrap(),
-                &Decimal::from_str(&delta.power_igcc_in).unwrap(),
-                &Decimal::from_str(&delta.power_igcc_out).unwrap(),
-                &Decimal::from_str(&delta.power_mfrrda_in).unwrap(),
-                &Decimal::from_str(&delta.power_mfrrda_out).unwrap(),
-                &parse_some_f64(&delta.power_picasso_in),
-                &parse_some_f64(&delta.power_picasso_out),
-                &parse_some_f64(&delta.max_upw_regulation_price),
-                &parse_some_f64(&delta.min_downw_regulation_price),
-                &Decimal::from_str(&delta.mid_price).unwrap(),
-            ]
-        ).await?;
+//     client.batch_execute(r#"
+//         CREATE TABLE IF NOT EXISTS balance_delta (
+//             time_stamp                  TIMESTAMP WITH TIME ZONE NOT NULL PRIMARY KEY,
+//             power_afrr_in               DECIMAL NOT NULL,
+//             power_afrr_out              DECIMAL NOT NULL,
+//             power_igcc_in               DECIMAL NOT NULL,
+//             power_igcc_out              DECIMAL NOT NULL,
+//             power_mfrrda_in             DECIMAL NOT NULL,
+//             power_mfrrda_out            DECIMAL NOT NULL,
+//             power_picasso_in            DECIMAL NOT NULL,
+//             power_picasso_out           DECIMAL NOT NULL,
+//             max_upw_regulation_price    DECIMAL,
+//             min_downw_regulation_price  DECIMAL,
+//             mid_price                   DECIMAL NOT NULL
+//         );
+//         CREATE INDEX IF NOT EXISTS balance_delta_time_stamp ON balance_delta (time_stamp);
+//     "#).await?;
 
-        inserted_rows += 1;
-    }
+//     Ok(())
+// }
 
-    println!("inserted {} rows into the balance_delta table", inserted_rows);
+// fn parse_some_f64 (str: &Option<String>) -> Option<Decimal> {
+//     if let Some(string) = str {
+//         match Decimal::from_str(&string) {
+//             Ok(decimal) => Some(decimal),
+//             Err(_) => None,
+//         }
+//     } else {
+//         None
+//     }
+// }
 
-    Ok(())
-}
+// pub async fn insert_balance_delta (client: &Client, balance_delta: &Vec<BalanceDeltaPoint>) -> Result<(), Error> {
 
-pub async fn get_balance_delta (client: &Client, from: &DateTime<Utc>, to: &DateTime<Utc>) -> Result<Vec<BalanceDelta>, Error> {
+//     let mut inserted_rows = 0;
 
-    let before = Instant::now();
+//     for delta in balance_delta {
+//         client.execute(
+//             r#"
+//                 INSERT INTO balance_delta (
+//                     time_stamp,
+//                     power_afrr_in,
+//                     power_afrr_out,
+//                     power_igcc_in,
+//                     power_igcc_out,
+//                     power_mfrrda_in,
+//                     power_mfrrda_out,
+//                     power_picasso_in,
+//                     power_picasso_out,
+//                     max_upw_regulation_price,
+//                     min_downw_regulation_price,
+//                     mid_price
+//                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+//             "#,
+//             &[
+//                 &parse_tennet_time_stamp(&delta.time_interval_start),
+//                 &Decimal::from_str(&delta.power_afrr_in).unwrap(),
+//                 &Decimal::from_str(&delta.power_afrr_out).unwrap(),
+//                 &Decimal::from_str(&delta.power_igcc_in).unwrap(),
+//                 &Decimal::from_str(&delta.power_igcc_out).unwrap(),
+//                 &Decimal::from_str(&delta.power_mfrrda_in).unwrap(),
+//                 &Decimal::from_str(&delta.power_mfrrda_out).unwrap(),
+//                 &parse_some_f64(&delta.power_picasso_in),
+//                 &parse_some_f64(&delta.power_picasso_out),
+//                 &parse_some_f64(&delta.max_upw_regulation_price),
+//                 &parse_some_f64(&delta.min_downw_regulation_price),
+//                 &Decimal::from_str(&delta.mid_price).unwrap(),
+//             ]
+//         ).await?;
 
-    let query = client.query(
-        "
-            SELECT * FROM balance_delta
-            WHERE time_stamp >= $1
-            AND time_stamp <= $2
-            ORDER BY time_stamp ASC
-        ",
-        &[
-            from,
-            to,
-        ]
-    ).await?;
+//         inserted_rows += 1;
+//     }
 
-    let mut balance_delta_vec = vec![];
+//     println!("inserted {} rows into the balance_delta table", inserted_rows);
 
-    for row in query {
-        let balance_delta = BalanceDelta {
-            time_stamp: row.get(0),
-            power_afrr_in: row.get(1),
-            power_afrr_out: row.get(2),
-            power_igcc_in: row.get(3),
-            power_igcc_out: row.get(4),
-            power_mfrrda_in: row.get(5),
-            power_mfrrda_out: row.get(6),
-            power_picasso_in: row.get(7),
-            power_picasso_out: row.get(8),
-            max_upw_regulation_price: row.get(9),
-            min_downw_regulation_price: row.get(10),
-            mid_price: row.get(11),
-        };
+//     Ok(())
+// }
 
-        balance_delta_vec.push(balance_delta)
-    }
+// pub async fn get_balance_delta (client: &Client, from: &DateTime<Utc>, to: &DateTime<Utc>) -> Result<Vec<BalanceDelta>, Error> {
 
-    println!("Query took: {:.2?}", before.elapsed());
+//     let before = Instant::now();
 
-    println!("{:#?}", balance_delta_vec);
+//     let query = client.query(
+//         "
+//             SELECT * FROM balance_delta
+//             WHERE time_stamp >= $1
+//             AND time_stamp <= $2
+//             ORDER BY time_stamp ASC
+//         ",
+//         &[
+//             from,
+//             to,
+//         ]
+//     ).await?;
 
-    Ok(balance_delta_vec)
-}
+//     let mut balance_delta_vec = vec![];
 
-pub async fn get_latest_balance_delta (client: &Client) -> Result<Option<DateTime<Utc>>, Error> {
+//     for row in query {
+//         let balance_delta = BalanceDelta {
+//             time_stamp: row.get(0),
+//             power_afrr_in: row.get(1),
+//             power_afrr_out: row.get(2),
+//             power_igcc_in: row.get(3),
+//             power_igcc_out: row.get(4),
+//             power_mfrrda_in: row.get(5),
+//             power_mfrrda_out: row.get(6),
+//             power_picasso_in: row.get(7),
+//             power_picasso_out: row.get(8),
+//             max_upw_regulation_price: row.get(9),
+//             min_downw_regulation_price: row.get(10),
+//             mid_price: row.get(11),
+//         };
 
-    let query = client.query("
-       SELECT time_stamp FROM balance_delta
-       ORDER BY time_stamp DESC
-       LIMIT 1
-    ", &[]).await?;
+//         balance_delta_vec.push(balance_delta)
+//     }
 
-    let mut last_time_stamp: Option<DateTime<Utc>> = None;
+//     println!("Query took: {:.2?}", before.elapsed());
 
-    for row in query {
-        last_time_stamp = Some(row.get(0))
-    }
+//     println!("{:#?}", balance_delta_vec);
 
-    println!("last_time_stamp: {:#?}", last_time_stamp);
+//     Ok(balance_delta_vec)
+// }
 
-    Ok(last_time_stamp)
-}
+// pub async fn get_latest_balance_delta (client: &Client) -> Result<Option<DateTime<Utc>>, Error> {
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BalanceDelta {
-    pub time_stamp: DateTime<Utc>,
-    pub power_afrr_in: Decimal,
-    pub power_afrr_out: Decimal,
-    pub power_igcc_in: Decimal,
-    pub power_igcc_out: Decimal,
-    pub power_mfrrda_in: Decimal,
-    pub power_mfrrda_out: Decimal,
-    pub power_picasso_in: Option<Decimal>,
-    pub power_picasso_out: Option<Decimal>,
-    pub max_upw_regulation_price: Option<Decimal>,
-    pub min_downw_regulation_price: Option<Decimal>,
-    pub mid_price: Decimal,
-}
+//     let query = client.query("
+//        SELECT time_stamp FROM balance_delta
+//        ORDER BY time_stamp DESC
+//        LIMIT 1
+//     ", &[]).await?;
 
-// impl From<BalanceDelta> for Vec<u8> {
+//     let mut last_time_stamp: Option<DateTime<Utc>> = None;
+
+//     for row in query {
+//         last_time_stamp = Some(row.get(0))
+//     }
+
+//     println!("last_time_stamp: {:#?}", last_time_stamp);
+
+//     Ok(last_time_stamp)
+// }
+
+// #[derive(Debug, Serialize, Deserialize)]
+// pub struct BalanceDelta {
+//     pub time_stamp: DateTime<Utc>,
+//     pub power_afrr_in: Decimal,
+//     pub power_afrr_out: Decimal,
+//     pub power_igcc_in: Decimal,
+//     pub power_igcc_out: Decimal,
+//     pub power_mfrrda_in: Decimal,
+//     pub power_mfrrda_out: Decimal,
+//     pub power_picasso_in: Option<Decimal>,
+//     pub power_picasso_out: Option<Decimal>,
+//     pub max_upw_regulation_price: Option<Decimal>,
+//     pub min_downw_regulation_price: Option<Decimal>,
+//     pub mid_price: Decimal,
+// }
+
+// impl From<BalanceDelta> for String {
 //     fn from(value: BalanceDelta) -> Self {
-//         bincode::serialize(&value).unwrap()
+//         serde_json::ser::to_string(&value).unwrap()
 //     }
 // }
 
-// impl From<&BalanceDelta> for Vec<u8> {
+// impl From<&BalanceDelta> for String {
 //     fn from(value: &BalanceDelta) -> Self {
-//         bincode::serialize(value).unwrap()
+//         serde_json::ser::to_string(value).unwrap()
 //     }
 // }
-
-impl From<BalanceDelta> for String {
-    fn from(value: BalanceDelta) -> Self {
-        serde_json::ser::to_string(&value).unwrap()
-    }
-}
-
-impl From<&BalanceDelta> for String {
-    fn from(value: &BalanceDelta) -> Self {
-        serde_json::ser::to_string(value).unwrap()
-    }
-}

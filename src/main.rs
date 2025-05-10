@@ -17,7 +17,6 @@ use axum::{
     Router
 };
 use tracing_subscriber::prelude::*;
-use dotenv::dotenv;
 
 mod config;
 mod tennet;
@@ -44,8 +43,6 @@ async fn main() {
 
     let subscriber = tracing_subscriber::FmtSubscriber::new();
     tracing::subscriber::set_global_default(subscriber).unwrap(); 
-
-    dotenv().ok();
 
     // let db_client = db::setup_db(&vec![]).await.expect("Failed to setup database client.");
 

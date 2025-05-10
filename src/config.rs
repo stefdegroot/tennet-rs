@@ -6,6 +6,12 @@ use toml;
 use lazy_static::lazy_static;
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct Tennet {
+    pub api_url: String,
+    pub api_key: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct DB {
     pub user: String,
     pub password: String,
@@ -15,6 +21,7 @@ pub struct DB {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config {
+    pub tennet: Tennet,
     pub db: DB,
 }
 

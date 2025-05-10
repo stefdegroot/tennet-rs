@@ -1,6 +1,0 @@
-
-[db]
-user        = "admin"
-password    = "root"
-name        = "test_db"
-host        = "localhost"

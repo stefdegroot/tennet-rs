@@ -24,6 +24,8 @@ pub async fn setup_db () -> Result<Pool<Postgres>, sqlx::Error> {
         .max_connections(5)
         .connect(&connection_string).await?;
 
+    balance_delta::create_table(&pool).await?;
+
     Ok(pool)
 }
 

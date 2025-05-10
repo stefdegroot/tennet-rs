@@ -7,6 +7,8 @@ use merit_order_list::MeritOrderList;
 use settlement_prices::SettlementPrices;
 use chrono::{DateTime, Utc};
 
+use crate::config::CONFIG;
+
 pub mod balance_delta;
 pub mod merit_order_list;
 pub mod settlement_prices;
@@ -65,11 +67,8 @@ pub struct TennetResponse <T> {
 impl TennetApi {
     pub fn init () -> Self {
 
-        let api_key = env::var("TENNET_API_KEY")
-            .expect("Tennet api key missing from enviroment variables.");
-
-        let base_url = env::var("TENNET_API_URL")
-            .expect("Tennet base url missing from enviroment variables.");
+        let api_key = CONFIG.tennet.api_key.clone();
+        let base_url = CONFIG.tennet.api_url.clone();
 
         let client = reqwest::Client::builder()
             .https_only(true)

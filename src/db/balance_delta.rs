@@ -1,12 +1,10 @@
 use std::sync::Arc;
+use sqlx::{Executor, FromRow, Pool, Postgres, QueryBuilder};
+use serde::{Serialize, Deserialize};
 
-use chrono::{Utc, DateTime};
-use sqlx::{postgres::PgPoolOptions, Pool, Postgres, QueryBuilder};
-
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, FromRow)]
 pub struct BalanceDeltaRecord {
-    pub time_stamp: DateTime<Utc>,
+    pub time_stamp: i64,
     pub power_afrr_in: f32,
     pub power_afrr_out: f32,
     pub power_igcc_in: f32,
@@ -20,54 +18,30 @@ pub struct BalanceDeltaRecord {
     pub mid_price: f32,
 }
 
+pub async fn create_table (pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
+
+    let r = pool.execute(r#"
+        CREATE TABLE IF NOT EXISTS balance_delta (
+            time_stamp                  BIGINT NOT NULL PRIMARY KEY,
+            power_afrr_in               REAL NOT NULL,
+            power_afrr_out              REAL NOT NULL,
+            power_igcc_in               REAL NOT NULL,
+            power_igcc_out              REAL NOT NULL,
+            power_mfrrda_in             REAL NOT NULL,
+            power_mfrrda_out            REAL NOT NULL,
+            power_picasso_in            REAL NOT NULL,
+            power_picasso_out           REAL NOT NULL,
+            max_upw_regulation_price    REAL,
+            min_downw_regulation_price  REAL,
+            mid_price                   REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS balance_delta_time_stamp ON balance_delta (time_stamp);
+    "#).await?;
+
+    Ok(())
+}
+
 pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[BalanceDeltaRecord]) -> Result<(), sqlx::Error> {
-
-    // let user = "admin";
-    // let password = "root";
-    // let db_name = "test_db";
-    // let connection_string = format!("postgres://{user}:{password}@localhost/{db_name}");
-    // let pool = PgPoolOptions::new()
-    //     .max_connections(5)
-    //     .connect(&connection_string).await?;
-
-    // let r = pool.execute(r#"
-    //     CREATE TABLE IF NOT EXISTS balance_delta (
-    //         time_stamp                  TIMESTAMP NOT NULL PRIMARY KEY,
-    //         power_afrr_in               REAL NOT NULL,
-    //         power_afrr_out              REAL NOT NULL,
-    //         power_igcc_in               REAL NOT NULL,
-    //         power_igcc_out              REAL NOT NULL,
-    //         power_mfrrda_in             REAL NOT NULL,
-    //         power_mfrrda_out            REAL NOT NULL,
-    //         power_picasso_in            REAL NOT NULL,
-    //         power_picasso_out           REAL NOT NULL,
-    //         max_upw_regulation_price    REAL,
-    //         min_downw_regulation_price  REAL,
-    //         mid_price                   REAL NOT NULL
-    //     );
-    //     CREATE INDEX IF NOT EXISTS balance_delta_time_stamp ON balance_delta (time_stamp);
-    // "#).await?;
-
-    // let test = sqlx::query(r#"
-    //     INSERT INTO balance_delta (
-    //         time_stamp,
-    //         power_afrr_in,
-    //         power_afrr_out,
-    //         power_igcc_in,
-    //         power_igcc_out,
-    //         power_mfrrda_in,
-    //         power_mfrrda_out,
-    //         power_picasso_in,
-    //         power_picasso_out,
-    //         max_upw_regulation_price,
-    //         min_downw_regulation_price,
-    //         mid_price
-    //     ) VALUES ('2025-05-08T18:55:17Z', 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, null, null, 80.0);
-    // "#).fetch_one(&pool).await?;
-
-    // println!("{:?}", test);
-
-    // println!("{:?}", records[0]);
 
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(r#"
         INSERT INTO balance_delta (
@@ -114,4 +88,37 @@ pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[BalanceDeltaRec
     tx.commit().await.unwrap();
 
     Ok(())
+}
+
+pub async fn get_latest (pool: &Pool<Postgres>) -> Option<BalanceDeltaRecord> {
+
+    let latest: Result<BalanceDeltaRecord, sqlx::Error> = sqlx::query_as(r#"
+        SELECT * FROM balance_delta ORDER BY time_stamp DESC LIMIT 1;
+    "#).fetch_one(pool).await;
+
+    match latest {
+        Ok(record) => Some(record),
+        Err(err) => {
+            println!("{:?}", err);
+            None
+        },
+    }
+}
+
+pub async fn get (pool: &Pool<Postgres>, time_stamp: i64) -> Option<BalanceDeltaRecord> {
+
+    let result: Result<BalanceDeltaRecord, sqlx::Error> = sqlx::query_as(r#"
+        SELECT * FROM balance_delta WHERE time_stamp = $1 LIMIT 1;
+    "#)
+        .bind(time_stamp)
+        .fetch_one(pool)
+        .await;
+
+    match result {
+        Ok(record) => Some(record),
+        Err(err) => {
+            println!("{:?}", err);
+            None
+        },
+    }
 }

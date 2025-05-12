@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use sqlx::{Executor, FromRow, Pool, Postgres, QueryBuilder};
 use serde::{Serialize, Deserialize};
+use std::convert::TryFrom;
 
 #[derive(Clone, Debug, Serialize, Deserialize, FromRow)]
 pub struct BalanceDeltaRecord {
@@ -16,6 +17,18 @@ pub struct BalanceDeltaRecord {
     pub max_upw_regulation_price: Option<f32>,
     pub min_downw_regulation_price: Option<f32>,
     pub mid_price: f32,
+}
+
+impl From<&BalanceDeltaRecord> for String {
+    fn from(value: &BalanceDeltaRecord) -> Self {
+        serde_json::ser::to_string(value).unwrap()
+    }
+}
+
+impl From<BalanceDeltaRecord> for String {
+    fn from(value: BalanceDeltaRecord) -> Self {
+        serde_json::ser::to_string(&value).unwrap()
+    }
 }
 
 pub async fn create_table (pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
@@ -98,6 +111,25 @@ pub async fn get_latest (pool: &Pool<Postgres>) -> Option<BalanceDeltaRecord> {
 
     match latest {
         Ok(record) => Some(record),
+        Err(err) => {
+            println!("{:?}", err);
+            None
+        },
+    }
+}
+
+pub async fn get_range (pool: &Pool<Postgres>, start: i64, end: i64) -> Option<Vec<BalanceDeltaRecord>> {
+
+     let result: Result<Vec<BalanceDeltaRecord>, sqlx::Error> = sqlx::query_as(r#"
+        SELECT * FROM balance_delta WHERE time_stamp >= $1 AND time_stamp <= $2 ORDER BY time_stamp ASC;
+    "#)
+        .bind(start)
+        .bind(end)
+        .fetch_all(pool)
+        .await;
+
+    match result {
+        Ok(records) => Some(records),
         Err(err) => {
             println!("{:?}", err);
             None

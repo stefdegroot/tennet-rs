@@ -34,17 +34,8 @@ pub struct AppState {
 #[tokio::main]
 async fn main() {
 
-    // construct a subscriber that prints formatted traces to stdout
-    // let console_layer = console_subscriber::spawn();
-    // tracing_subscriber::registry()
-    //     .with(console_layer)
-    //     .with(tracing_subscriber::fmt::layer().with_filter(tracing_subscriber::filter::LevelFilter::INFO))
-    //     .init();
-
     let subscriber = tracing_subscriber::FmtSubscriber::new();
     tracing::subscriber::set_global_default(subscriber).unwrap(); 
-
-    // let db_client = db::setup_db(&vec![]).await.expect("Failed to setup database client.");
 
     let tennet_api = tennet::TennetApi::init();
 
@@ -61,10 +52,10 @@ async fn main() {
     tennet::balance_delta::import_balance_delta(app_state.clone()).await;
 
     let app = Router::new()
-        // .route("/balance-delta", get(get_balance_delta))
+        .route("/balance-delta", get(get_balance_delta))
         .with_state(app_state.clone());
 
-    // sync_service(app_state.clone());
+    sync_service(app_state.clone());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await.unwrap();
     axum::serve(listener, app)
@@ -74,67 +65,41 @@ async fn main() {
 
 }
 
-async fn fetch_balance_delta () {
-    let utc = Utc::now();
+async fn get_balance_delta(
+    Query(params): Query<HashMap<String, String>>,
+    State(state): State<AppState>,
+) -> Result<AppJson<Vec<db::balance_delta::BalanceDeltaRecord>>, AppError> {
 
-    let minutes = utc.minute();
-    let seconds = utc.second();
-    let nano = utc.nanosecond();
+    println!("{:#?}", params);
 
-    println!("now: {:?}", utc);
-    println!("minutes: {:?}", minutes);
-    println!("seconds: {:?}", seconds);
-    println!("nano: {:?}", nano);
+    let date_from = match params.get("date_from") {
+        Some(date) => DateTime::<Utc>::from_str(&date).unwrap(),
+        None => {
+            println!("date_from query param missing");
+            return Err(AppError::BasicError((StatusCode::BAD_REQUEST, "date_from query param missing")))
+        },
+    };
+
+    let date_to = match params.get("date_to") {
+        Some(date) => DateTime::<Utc>::from_str(&date).unwrap(),
+        None => {
+            println!("date_to query param missing");
+            return Err(AppError::BasicError((StatusCode::BAD_REQUEST, "date_to query param missing")))
+        },
+    };
+
+    let data = db::balance_delta::get_range(
+        &state.db_client, 
+        date_from.timestamp(), 
+        date_to.timestamp()
+    ).await;
+
+    if let Some(records) = data {
+        Ok(AppJson(records))
+    } else {
+        Ok(AppJson(vec![]))
+    }
 }
-
-// async fn get_balance_delta (
-//     Query(params): Query<HashMap<String, String>>,
-//     State(state): State<AppState>,
-// ) -> Result<AppJson<Vec<BalanceDelta>>, AppError> {
-
-//     println!("{:#?}", params);
-
-//     let date_from = match params.get("date_from") {
-//         Some(date) => DateTime::<Utc>::from_str(&date).unwrap(),
-//         None => {
-//             println!("date_from query param missing");
-//             return Err(AppError::BasicError((StatusCode::BAD_REQUEST, "date_from query param missing")))
-//         },
-//     };
-
-//     let date_to = match params.get("date_to") {
-//         Some(date) => DateTime::<Utc>::from_str(&date).unwrap(),
-//         None => {
-//             println!("date_to query param missing");
-//             return Err(AppError::BasicError((StatusCode::BAD_REQUEST, "date_to query param missing")))
-//         },
-//     };
-
-//     let data = match db::get_balance_delta(
-//         &state.db_client,
-//         &date_from,
-//         &date_to,
-//     ).await {
-//         Ok(data) => data,
-//         Err(err) => {
-//             println!("{:#?}", err);
-//             return Err(AppError::BasicError((StatusCode::INTERNAL_SERVER_ERROR, "Failed to load balance delta data")))
-//         }
-//     };
-
-//     // let _ = state.tennet_api.get_balance_delta(date_from, date_to).await;
-//     // match state.tennet_api.get_merit_order_list(date_from, date_to).await {
-//     // match state.tennet_api.get_settlement_prices(date_from, date_to).await {
-//     //     Ok(r) => {
-//     //         println!("success");
-//     //     },
-//     //     Err(err) => {
-//     //         println!("{:#?}", err);
-//     //     }
-//     // }
-
-//     return Ok(AppJson(data));
-// }
 
 #[derive(FromRequest)]
 #[from_request(via(axum::Json), rejection(AppError))]

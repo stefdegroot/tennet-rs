@@ -96,7 +96,7 @@ pub async fn import_balance_delta (app_state: AppState) {
         import_csv(&app_state, path, sync_from).await;
     }
 
-    sync_balance_delta(&app_state).await;
+    // sync_balance_delta(&app_state).await;
 }
 
 fn default_to_zero (option: Option<f32>) -> f32 {
@@ -207,7 +207,7 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
     }
 }
 
-async fn sync_balance_delta (app_state: &AppState) {
+pub async fn sync_balance_delta (app_state: &AppState) -> Vec<BalanceDeltaRecord> {
 
     let latest_record = balance_delta::get_latest(&app_state.db_client).await;
     let mut sync_from = *FIRST_BALANCE_DATE;
@@ -281,6 +281,8 @@ async fn sync_balance_delta (app_state: &AppState) {
         let result = balance_delta::insert_many(&app_state.db_client, records_chunk).await;
         println!("{:?}", result);
     }
+
+    records
 }
 
 fn default_to_zero_option (option: Option<String>) -> Option<f32> {

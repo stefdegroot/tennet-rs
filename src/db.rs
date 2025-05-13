@@ -9,6 +9,10 @@ use crate::config::CONFIG;
 use sqlx::{postgres::PgPoolOptions, Execute, Executor, Postgres, Pool, QueryBuilder};
 
 pub mod balance_delta;
+pub mod merit_order;
+
+pub const PG_MAX_QUERY_PARAMS: usize = 65_535;
+pub const RECORD_COLUMNS: usize = 12;
 
 pub async fn setup_db () -> Result<Pool<Postgres>, sqlx::Error> {
 
@@ -25,6 +29,7 @@ pub async fn setup_db () -> Result<Pool<Postgres>, sqlx::Error> {
         .connect(&connection_string).await?;
 
     balance_delta::create_table(&pool).await?;
+    merit_order::create_table(&pool).await?;
 
     Ok(pool)
 }

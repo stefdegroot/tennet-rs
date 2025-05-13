@@ -49,13 +49,14 @@ async fn main() {
         mqtt_client: Arc::new(mqtt_client),
     };
 
-    tennet::balance_delta::import_balance_delta(app_state.clone()).await;
+    tennet::merit_order::import_merit_order(app_state.clone()).await;
+    // tennet::balance_delta::import_balance_delta(app_state.clone()).await;
 
     let app = Router::new()
         .route("/balance-delta", get(get_balance_delta))
         .with_state(app_state.clone());
 
-    sync_service(app_state.clone());
+    // sync_service(app_state.clone());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await.unwrap();
     axum::serve(listener, app)

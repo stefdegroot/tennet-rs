@@ -8,7 +8,12 @@ use lazy_static::lazy_static;
 
 use crate::AppState;
 use crate::tennet::time::parse_tennet_time_stamp;
-use crate::db::{balance_delta, balance_delta::BalanceDeltaRecord};
+use crate::db::{
+    balance_delta,
+    balance_delta::BalanceDeltaRecord,
+    PG_MAX_QUERY_PARAMS,
+    RECORD_COLUMNS,
+};
 
 #[derive(Deserialize, Debug)]
 pub struct BalanceDeltaPoint {
@@ -30,15 +35,14 @@ pub struct BalanceDeltaPoint {
     pub mid_price: String,
 }
 
-
 #[derive(Deserialize, Debug)]
 struct BalanceDeltaRow {
     #[serde(rename="Timeinterval Start Loc")]
     pub time_interval_start: String,
-    #[serde(rename="Timeinterval End Loc")]
-    pub time_interval_end: String,
-    #[serde(rename="Isp")]
-    pub sequence: i32,
+    // #[serde(rename="Timeinterval End Loc")]
+    // pub time_interval_end: String,
+    // #[serde(rename="Isp")]
+    // pub sequence: i32,
     #[serde(rename="Power In Activated Afrr")]
     pub power_afrr_in: Option<f32>,
     #[serde(rename="Power Out Activated Afrr")]
@@ -62,9 +66,6 @@ struct BalanceDeltaRow {
     #[serde(rename="Mid Price")]
     pub mid_price: Option<f32>,
 }
-
-pub const PG_MAX_QUERY_PARAMS: usize = 65_535;
-pub const RECORD_COLUMNS: usize = 12;
 
 lazy_static! {
     pub static ref FIRST_BALANCE_DATE: i64 = Amsterdam.with_ymd_and_hms(2018, 5, 1, 0, 0, 0).unwrap().timestamp();
@@ -95,8 +96,6 @@ pub async fn import_balance_delta (app_state: AppState) {
 
         import_csv(&app_state, path, sync_from).await;
     }
-
-    // sync_balance_delta(&app_state).await;
 }
 
 fn default_to_zero (option: Option<f32>) -> f32 {
@@ -133,8 +132,6 @@ fn get_time_from_file_name (filename: &String) -> (i64, i64) {
         0,
         0
     );
-
-    // println!("{filename}: {:?} - {:?}", start_time, end_time);
 
     return (
         start_time.earliest().unwrap().timestamp(),

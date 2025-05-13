@@ -3,14 +3,14 @@ use reqwest::{Client, header, Url};
 use serde::{Deserialize, de::DeserializeOwned};
 use anyhow::Result;
 use balance_delta::BalanceDeltaPoint;
-use merit_order_list::MeritOrderList;
 use settlement_prices::SettlementPrices;
 use chrono::{DateTime, Utc};
+use crate::db::merit_order::MeritOrderList;
 
 use crate::config::CONFIG;
 
 pub mod balance_delta;
-pub mod merit_order_list;
+pub mod merit_order;
 pub mod settlement_prices;
 pub mod time;
 

@@ -1,9 +1,8 @@
-use std::env;
 use reqwest::{Client, header, Url};
 use serde::{Deserialize, de::DeserializeOwned};
 use anyhow::Result;
 use balance_delta::BalanceDeltaPoint;
-use settlement_prices::SettlementPrices;
+use settlement_prices::SettlementPricePoint;
 use chrono::{DateTime, Utc};
 
 use crate::config::CONFIG;
@@ -127,9 +126,9 @@ impl TennetApi {
         Ok(response)
     }
 
-    pub async fn get_settlement_prices (&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Result<TennetResponse<SettlementPrices>> {
+    pub async fn get_settlement_prices (&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Result<TennetResponse<SettlementPricePoint>> {
 
-        let response = self.request::<SettlementPrices>(
+        let response = self.request::<SettlementPricePoint>(
             "/v1/settlement-prices",
             &[
                 ("date_from", &time::create_tennet_time_stamp(from)),

@@ -51,6 +51,7 @@ async fn main() {
 
     tennet::merit_order::import_merit_order(app_state.clone()).await;
     tennet::balance_delta::import_balance_delta(app_state.clone()).await;
+    tennet::settlement_prices::import_settlement_prices(app_state.clone()).await;
 
     let app = Router::new()
         .route("/balance-delta", get(get_balance_delta))

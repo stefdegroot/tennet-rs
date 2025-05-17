@@ -105,14 +105,21 @@ pub async fn sync_merit_order (app_state: &AppState) -> Vec<merit_order::MeritOr
         DateTime::from_timestamp(end, 0).unwrap(),
     );
 
-    let result = app_state.tennet_api.get_merit_order_list(
+    let mut lists = vec![];
+
+    let result = match  app_state.tennet_api.get_merit_order_list(
         DateTime::from_timestamp(start, 0).unwrap(),
         DateTime::from_timestamp(end, 0).unwrap(),
-    ).await.unwrap();
+    ).await {
+        Ok(r) => r,
+        Err(err) => {
+            println!("{:?}", err);
+            return lists;
+        } 
+    };
 
     merit_order::delete_range(&app_state.db_client, start, end).await;
 
-    let mut lists = vec![];
     let mut ambiguous_times = HashSet::new();
 
     for time_series in result.response.time_series {

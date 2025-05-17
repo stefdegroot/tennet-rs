@@ -1,25 +1,20 @@
-use chrono::{DateTime, Timelike, Utc};
+use chrono::{Timelike, Utc};
 use std::clone::Clone;
 use tokio::{
     task,
     time::{sleep, Duration}
 };
 use crate::{
-    // db::get_balance_delta,
     AppState,
     tennet
 };
-// use crate::db::{
-//     get_latest_balance_delta,
-//     insert_balance_delta,
-// };
 
 pub fn sync_service (app_state: AppState) {
 
     let _ = schedule_tasks(ScheduleGranularity::SECONDS, &[5],app_state.clone(), balance_delta_service, "balance_delta");
     let _ = schedule_tasks(ScheduleGranularity::MINUTES, &[0, 15, 30, 45],app_state.clone(), merit_order_service, "merit_order");
     let _ = schedule_tasks(ScheduleGranularity::MINUTES, &[5],app_state.clone(), settlement_prices_service, "settlement_prices");
-    
+
 }
 
 fn balance_delta_service (app_state: AppState) {
@@ -51,7 +46,17 @@ fn merit_order_service (app_state: AppState) {
 }
 
 fn settlement_prices_service (app_state: AppState) {
+    
     tracing::info!("sync settlement prices");
+
+    task::spawn(async move {
+
+        let result = tennet::settlement_prices::sync_settlement_prices(&app_state).await;
+
+        if result.len() > 0 {
+            app_state.mqtt_client.publish("tennet/settlement-prices", serde_json::ser::to_string(&result).unwrap()).await;
+        }
+    });
 }
 
 const SECONDS_TO_NANO: u64 = u64::pow(10, 9);
@@ -129,29 +134,4 @@ fn schedule_tasks<T: Send + Clone + 'static>(granularity: ScheduleGranularity, o
     };
 
     stop_schedule
-}
-
-fn schedule_service (app_state: AppState, offset: u64, interval: u64, callback: fn (app_state: AppState) -> (), name: String){
-    task::spawn(async move {
-        loop {
-            let utc = Utc::now();
-            let seconds = utc.second() as u64;
-            let nano = utc.nanosecond() as u64;
-            let from_start_of_minute = seconds * SECONDS_TO_NANO + nano;
-            let mark = offset * SECONDS_TO_NANO;
-            let minute = interval * SECONDS_TO_NANO;
-
-            let wait = if from_start_of_minute > mark {
-                mark + minute - from_start_of_minute
-            } else {
-                mark - from_start_of_minute
-            };
-            
-            println!("service scheduled {}, waiting {:.3}", name, from_start_of_minute as f64 / f64::powi(10.0, 9));
-
-            sleep(Duration::from_nanos(wait)).await;
-
-            callback(app_state.clone());
-        }
-    });
 }

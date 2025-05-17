@@ -3,7 +3,6 @@ use std::{io, path::PathBuf};
 use std::collections::HashSet;
 use chrono::{offset::LocalResult, TimeZone, DateTime, Utc};
 use chrono_tz::Europe::Amsterdam;
-use std::time::{Duration, Instant};
 use lazy_static::lazy_static;
 
 use crate::AppState;
@@ -224,12 +223,18 @@ pub async fn sync_balance_delta (app_state: &AppState) -> Vec<BalanceDeltaRecord
         DateTime::from_timestamp(end, 0).unwrap(),
     );
 
-    let result = app_state.tennet_api.get_balance_delta(
+    let mut records: Vec<BalanceDeltaRecord> = vec![];
+
+    let result = match app_state.tennet_api.get_balance_delta(
         DateTime::from_timestamp(start, 0).unwrap(),
         DateTime::from_timestamp(end, 0).unwrap(),
-    ).await.unwrap();
-
-    let mut records: Vec<BalanceDeltaRecord> = vec![];
+    ).await {
+        Ok(r) => r,
+        Err(err) => {
+            println!("{:?}", err);
+            return records;
+        }
+    };
 
     for time_series in result.response.time_series {
 

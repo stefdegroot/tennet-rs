@@ -219,7 +219,7 @@ pub async fn sync_balance_delta (app_state: &AppState) -> Vec<BalanceDeltaRecord
     let start = sync_from + 60;
     let end = sync_from + i64::min(gap, 86400) + 60;
 
-    println!("syncing: {:?} - {:?}",
+    println!("syncing balance delta: {:?} - {:?}",
         DateTime::from_timestamp(start, 0).unwrap(),
         DateTime::from_timestamp(end, 0).unwrap(),
     );
@@ -253,9 +253,6 @@ pub async fn sync_balance_delta (app_state: &AppState) -> Vec<BalanceDeltaRecord
             };
 
             if let Some(time_stamp) = time {
-
-                println!("{:?}", time_stamp);
-
                 records.push(BalanceDeltaRecord { 
                     time_stamp: time_stamp.timestamp(), 
                     power_afrr_in: default_string_to_zero(point.power_afrr_in), 

@@ -5,7 +5,6 @@ use anyhow::Result;
 use balance_delta::BalanceDeltaPoint;
 use settlement_prices::SettlementPrices;
 use chrono::{DateTime, Utc};
-use crate::db::merit_order::MeritOrderList;
 
 use crate::config::CONFIG;
 
@@ -115,9 +114,9 @@ impl TennetApi {
         Ok(response)
     }
 
-    pub async fn get_merit_order_list (&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Result<TennetResponse<MeritOrderList>> {
+    pub async fn get_merit_order_list (&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Result<TennetResponse<merit_order::MeritOrderPoint>> {
 
-        let response = self.request::<MeritOrderList>(
+        let response = self.request::<merit_order::MeritOrderPoint>(
             "/v1/merit-order-list",
             &[
                 ("date_from", &time::create_tennet_time_stamp(from)),

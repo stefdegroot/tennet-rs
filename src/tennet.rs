@@ -1,6 +1,6 @@
 use reqwest::{Client, header, Url};
 use serde::{Deserialize, de::DeserializeOwned};
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use balance_delta::BalanceDeltaPoint;
 use settlement_prices::SettlementPricePoint;
 use chrono::{DateTime, Utc};
@@ -62,6 +62,20 @@ pub struct TennetResponse <T> {
     pub response: TennetResponseInfo<T>
 }
 
+#[derive(Deserialize, Debug)]
+pub struct TennetError {
+    error_date_time: String,
+    error_id: String,
+    error_message: String,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(untagged)]
+enum TennetAPIResponse <T> {
+    DATA(TennetResponse<T>),
+    ERR(TennetError),
+}
+
 impl TennetApi {
     pub fn init () -> Self {
 
@@ -94,10 +108,16 @@ impl TennetApi {
             .header(header::ACCEPT, "application/json")
             .send()
             .await?
-            .json::<TennetResponse<R>>()
+            .json::<TennetAPIResponse<R>>()
             .await?;
 
-        Ok(response)
+        match response {
+            TennetAPIResponse::DATA(tennet_response) => Ok(tennet_response),
+            TennetAPIResponse::ERR(tennet_error) => {
+                tracing::error!(tennet_error.error_message);
+                Err(anyhow!(tennet_error.error_message))
+            },
+        }
     }
 
     pub async fn get_balance_delta (&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Result<TennetResponse<BalanceDeltaPoint>> {

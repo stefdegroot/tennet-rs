@@ -3,4 +3,7 @@
     "./Cargo.toml"
   ],
   "editor.tabSize": 4,
+  "cSpell.words": [
+    "Tennet"
+  ],
 }

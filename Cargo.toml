@@ -11,7 +11,6 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 anyhow = "1.0"
-tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"] }
 regex = "1"
 rust_decimal = { version = "1.37", features = ["db-tokio-postgres"] }
 rust_decimal_macros = "1.37"

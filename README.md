@@ -31,3 +31,12 @@ Setup local Postgres instance ([external docs](https://medium.com/@jewelski/quic
 ```shell
 docker-compose up -d
 ```
+
+docker login rg.nl-ams.scw.cloud/groot -u nologin --password-stdin <<< ""
+docker login rg.nl-ams.scw.cloud/groot -u nologin --password=""
+
+docker build -t groot.dev/tennet:0.1.7 .
+
+docker tag groot.dev/tennet:0.1.7 rg.nl-ams.scw.cloud/groot/groot.dev/tennet:0.1.7
+
+docker push rg.nl-ams.scw.cloud/groot/groot.dev/tennet:0.1.7

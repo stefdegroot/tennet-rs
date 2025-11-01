@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 use lazy_static::lazy_static;
 
 use crate::{
+    config::CONFIG,
     db::{
         merit_order::{self, MeritOrderList, MeritOrderRecord},
         PG_MAX_QUERY_PARAMS,
@@ -79,7 +80,7 @@ pub async fn import_merit_order (app_state: AppState) {
             continue;
         }
 
-        println!("importing: {:?}", name);
+        tracing::info!("importing: {:?}", name);
 
         import_csv(&app_state, path, sync_from).await;
     }
@@ -95,10 +96,17 @@ pub async fn sync_merit_order (app_state: &AppState) -> Vec<merit_order::MeritOr
     }
 
     let current_time_stamp = Utc::now().timestamp();
+    let start ;
+    let end;
 
-    let gap = current_time_stamp - sync_from;
-    let start = sync_from + 900;
-    let end = sync_from + 86400 + 900;
+    if current_time_stamp <= sync_from {
+        start = current_time_stamp - current_time_stamp % 900 + 900;
+        end = start + 86400;
+    } else {
+        start = sync_from + 900;
+        end = sync_from + 86400 + 900;
+    }
+
 
     println!("syncing merit order: {:?} - {:?}",
         DateTime::from_timestamp(start, 0).unwrap(),
@@ -192,7 +200,7 @@ pub async fn sync_merit_order (app_state: &AppState) -> Vec<merit_order::MeritOr
 
 fn get_files () -> io::Result<Vec<(PathBuf, String)>>  {
 
-    let dir_path = format!("./data/merit_order");
+    let dir_path = format!("{}/merit_order", CONFIG.data.path);
     let files = std::fs::read_dir(dir_path)?
         .map(|res| res.map(|e| (e.path(), e.file_name().into_string().unwrap())))
         .collect::<Result<Vec<_>, io::Error>>()?;

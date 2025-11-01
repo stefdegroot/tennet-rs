@@ -1,11 +1,12 @@
 
+use chrono::DateTime;
 use sqlx::{Postgres, Pool};
 use tennet::TennetApi;
 use notification::MQTT;
 use sync::sync_service;
 use tokio::signal;
-use std::sync::Arc;
-use tracing_subscriber::prelude::*;
+use std::{str::FromStr, sync::Arc};
+use tracing_subscriber::{prelude::*};
 
 mod config;
 mod tennet;
@@ -25,6 +26,9 @@ pub struct AppState {
 async fn main() {
 
     let subscriber = tracing_subscriber::FmtSubscriber::new();
+    // let subscriber = tracing_subscriber::FmtSubscriber::builder()
+    //     .with_max_level(tracing::Level::DEBUG)
+    //     .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap(); 
 
     let tennet_api = tennet::TennetApi::init();

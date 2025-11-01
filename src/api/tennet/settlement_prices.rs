@@ -15,7 +15,7 @@ pub async fn get_settlement_prices(
     State(state): State<AppState>,
 ) -> Result<AppJson<Vec<db::settlement_prices::SettlementPriceRecord>>, AppError> {
 
-    println!("get_settlement_prices: {:#?}", params);
+    tracing::info!("/tennet/settlement-prices: {:#?}", params);
 
     let date_from = match params.get("date_from") {
         Some(date) => DateTime::<Utc>::from_str(&date).unwrap(),

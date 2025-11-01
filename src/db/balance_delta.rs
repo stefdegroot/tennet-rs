@@ -54,7 +54,7 @@ pub async fn create_table (pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
     Ok(())
 }
 
-pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[BalanceDeltaRecord]) -> Result<(), sqlx::Error> {
+pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[BalanceDeltaRecord]) -> Result<u64, sqlx::Error> {
 
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(r#"
         INSERT INTO balance_delta (
@@ -100,7 +100,7 @@ pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[BalanceDeltaRec
 
     tx.commit().await.unwrap();
 
-    Ok(())
+    Ok(result.rows_affected())
 }
 
 pub async fn get_latest (pool: &Pool<Postgres>) -> Option<BalanceDeltaRecord> {

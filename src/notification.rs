@@ -1,8 +1,7 @@
 use std::time::Duration;
 use rumqttc::v5::{mqttbytes::QoS, AsyncClient, MqttOptions};
 use tokio::task;
-
-// use crate::db::BalanceDelta;
+use crate::config::CONFIG;
 
 pub struct MQTT {
     client: AsyncClient
@@ -19,6 +18,7 @@ impl MQTT {
         );
     
         mqtt_options.set_keep_alive(Duration::from_secs(5));
+        mqtt_options.set_credentials(&CONFIG.mosquitto.username, &CONFIG.mosquitto.password);
     
         let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
 

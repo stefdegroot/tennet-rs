@@ -15,7 +15,7 @@ pub async fn get_balance_delta(
     State(state): State<AppState>,
 ) -> Result<AppJson<Vec<db::balance_delta::BalanceDeltaRecord>>, AppError> {
 
-    println!("get_balance_delta: {:#?}", params);
+    tracing::info!("/tennet/balance-delta: {:#?}", params);
 
     let date_from = match params.get("date_from") {
         Some(date) => DateTime::<Utc>::from_str(&date).unwrap(),

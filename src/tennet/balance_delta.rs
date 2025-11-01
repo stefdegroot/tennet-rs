@@ -5,6 +5,7 @@ use chrono::{offset::LocalResult, TimeZone, DateTime, Utc};
 use chrono_tz::Europe::Amsterdam;
 use lazy_static::lazy_static;
 
+use crate::config::CONFIG;
 use crate::AppState;
 use crate::tennet::time::parse_tennet_time_stamp;
 use crate::db::{
@@ -91,7 +92,7 @@ pub async fn import_balance_delta (app_state: AppState) {
             continue;
         }
 
-        println!("importing: {:?}", name);
+        tracing::info!("importing: {:?}", name);
 
         import_csv(&app_state, path, sync_from).await;
     }
@@ -107,7 +108,7 @@ fn default_to_zero (option: Option<f32>) -> f32 {
 
 fn get_files () -> io::Result<Vec<(PathBuf, String)>>  {
 
-    let dir_path = format!("./data/balance_delta");
+    let dir_path = format!("{}/balance_delta", CONFIG.data.path);
     let files = std::fs::read_dir(dir_path)?
         .map(|res| res.map(|e| (e.path(), e.file_name().into_string().unwrap())))
         .collect::<Result<Vec<_>, io::Error>>()?;
@@ -152,7 +153,6 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
 
     for result in rdr.deserialize() {
 
-        // println!("{:?}", result);
         let row: BalanceDeltaRow = result.unwrap();
 
         let time =  match parse_tennet_time_stamp(&row.time_interval_start) {
@@ -198,8 +198,14 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
     }
 
     for records_chunk in records.chunks(PG_MAX_QUERY_PARAMS / RECORD_COLUMNS) {
-        let result = balance_delta::insert_many(&app_state.db_client, records_chunk).await;
-        println!("{:?}", result);
+        match balance_delta::insert_many(&app_state.db_client, records_chunk).await {
+            Ok(rows_affected) => {
+                tracing::info!("inserted {} records into balance delta db", rows_affected);
+            },
+            Err(err) => {
+                tracing::error!("{:#?}", err);
+            }
+        }
     }
 }
 
@@ -218,7 +224,8 @@ pub async fn sync_balance_delta (app_state: &AppState) -> Vec<BalanceDeltaRecord
     let start = sync_from + 60;
     let end = sync_from + i64::min(gap, 86400) + 60;
 
-    println!("syncing balance delta: {:?} - {:?}",
+    tracing::info!(
+        "syncing balance delta: {:?} - {:?}",
         DateTime::from_timestamp(start, 0).unwrap(),
         DateTime::from_timestamp(end, 0).unwrap(),
     );
@@ -277,8 +284,14 @@ pub async fn sync_balance_delta (app_state: &AppState) -> Vec<BalanceDeltaRecord
     }
 
     for records_chunk in records.chunks(PG_MAX_QUERY_PARAMS / RECORD_COLUMNS) {
-        let result = balance_delta::insert_many(&app_state.db_client, records_chunk).await;
-        println!("{:?}", result);
+        match balance_delta::insert_many(&app_state.db_client, records_chunk).await {
+            Ok(rows_affected) => {
+                tracing::info!("inserted {} records into balance delta db", rows_affected);
+            },
+            Err(err) => {
+                tracing::error!("{:#?}", err);
+            }
+        }
     }
 
     records

@@ -1,5 +1,5 @@
 use crate::config::CONFIG;
-use sqlx::{postgres::PgPoolOptions, Execute, Executor, Postgres, Pool, QueryBuilder};
+use sqlx::{postgres::PgPoolOptions, Postgres, Pool};
 
 pub mod balance_delta;
 pub mod merit_order;

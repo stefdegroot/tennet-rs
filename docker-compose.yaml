@@ -11,7 +11,9 @@ services:
       POSTGRES_PASSWORD: root
       POSTGRES_DB: test_db
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - type: bind
+        source: "/c/Users/stefd/Documenten/Code/rust/tennet/data/postgres"
+        target: /var/lib/postgresql/18/docker
     restart: unless-stopped
 
   pgadmin:

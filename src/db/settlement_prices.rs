@@ -46,7 +46,7 @@ pub async fn create_table (pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
     Ok(())
 }
 
-pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[SettlementPriceRecord]) -> Result<(), sqlx::Error> {
+pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[SettlementPriceRecord]) -> Result<u64, sqlx::Error> {
 
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(r#"
         INSERT INTO settlement_prices (
@@ -84,7 +84,7 @@ pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[SettlementPrice
 
     tx.commit().await.unwrap();
 
-    Ok(())
+    Ok(result.rows_affected())
 }
 
 pub async fn get_latest (pool: &Pool<Postgres>) -> Option<SettlementPriceRecord> {

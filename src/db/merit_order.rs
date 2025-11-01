@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use sqlx::{Executor, FromRow, Pool, Postgres, QueryBuilder};
 use serde::{Serialize, Deserialize};
-use std::convert::TryFrom;
 
 #[derive(Clone, Debug, Serialize, Deserialize, FromRow, PartialEq, PartialOrd)]
 pub struct MeritOrderRecord {

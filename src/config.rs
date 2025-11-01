@@ -6,6 +6,12 @@ use toml;
 use lazy_static::lazy_static;
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct Mosquitto {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct Tennet {
     pub api_url: String,
     pub api_key: String,
@@ -20,19 +26,27 @@ pub struct DB {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct Data {
+    pub path: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct Config {
     pub tennet: Tennet,
     pub db: DB,
+    pub mosquitto: Mosquitto,
+    pub data: Data,
 }
 
 pub fn load_config () -> Config {
 
-    let mut path = env::current_dir().unwrap();
-    path.push("config.toml");
+    // let mut path = env::current_dir().unwrap();
+    // path.push("/data/config.toml");
 
-    println!("{:?}", path);
+    // println!("{:?}", path);
 
-    let contents = match fs::read_to_string(path) {
+    // let contents = match fs::read_to_string("/data/config.toml") {
+    let contents = match fs::read_to_string("config.toml") {
         Ok(c) => c,
         Err(_) => {
             error!("Could not find config.toml file.");

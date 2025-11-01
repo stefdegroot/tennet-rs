@@ -70,10 +70,16 @@ pub struct TennetError {
 }
 
 #[derive(Deserialize, Debug)]
+pub struct BasicError {
+    error: String,
+}
+
+#[derive(Deserialize, Debug)]
 #[serde(untagged)]
 enum TennetAPIResponse <T> {
     DATA(TennetResponse<T>),
     ERR(TennetError),
+    BasicError(BasicError),
 }
 
 impl TennetApi {
@@ -107,16 +113,21 @@ impl TennetApi {
             .header("apikey", &self.api_key)
             .header(header::ACCEPT, "application/json")
             .send()
-            .await?
-            .json::<TennetAPIResponse<R>>()
             .await?;
 
-        match response {
+        let decoded_response = response.json::<TennetAPIResponse<R>>()
+            .await?;
+
+        match decoded_response {
             TennetAPIResponse::DATA(tennet_response) => Ok(tennet_response),
             TennetAPIResponse::ERR(tennet_error) => {
                 tracing::error!(tennet_error.error_message);
                 Err(anyhow!(tennet_error.error_message))
             },
+            TennetAPIResponse::BasicError(error) => {
+                tracing::error!(error.error);
+                Err(anyhow!(error.error))
+            }
         }
     }
 

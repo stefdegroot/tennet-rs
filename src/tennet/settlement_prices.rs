@@ -5,6 +5,7 @@ use chrono::{offset::LocalResult, TimeZone, DateTime, Utc};
 use chrono_tz::Europe::Amsterdam;
 use lazy_static::lazy_static;
 use crate::{
+    config::CONFIG,
     AppState,
     tennet::time::parse_tennet_time_stamp,
     db::{
@@ -83,7 +84,7 @@ pub async fn import_settlement_prices (app_state: AppState) {
             continue;
         }
 
-        println!("importing: {:?}", name);
+        tracing::info!("import {:?}", name);
 
         import_csv(&app_state, path, sync_from).await;
     }
@@ -91,7 +92,7 @@ pub async fn import_settlement_prices (app_state: AppState) {
 
 fn get_files () -> io::Result<Vec<(PathBuf, String)>>  {
 
-    let dir_path = format!("./data/settlement_prices");
+    let dir_path = format!("{}/settlement_prices", CONFIG.data.path);
     let files = std::fs::read_dir(dir_path)?
         .map(|res| res.map(|e| (e.path(), e.file_name().into_string().unwrap())))
         .collect::<Result<Vec<_>, io::Error>>()?;
@@ -186,8 +187,14 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
     }
 
     for records_chunk in records.chunks(PG_MAX_QUERY_PARAMS / RECORD_COLUMNS) {
-        let result = settlement_prices::insert_many(&app_state.db_client, records_chunk).await;
-        println!("{:?}", result);
+        match settlement_prices::insert_many(&app_state.db_client, records_chunk).await {
+            Ok(rows_affected) => {
+                tracing::info!("inserted {} records into settlement prices db", rows_affected);
+            },
+            Err(err) => {
+                tracing::error!("{:#?}", err);
+            }
+        }
     }
 }
 
@@ -208,13 +215,18 @@ pub async fn sync_settlement_prices (app_state: &AppState) -> Vec<SettlementPric
 
     let mut records: Vec<SettlementPriceRecord> = vec![];
 
+    tracing::info!(
+        "syncing settlement prices: {:?} - {:?}",
+        DateTime::from_timestamp(start, 0).unwrap(),
+        DateTime::from_timestamp(end, 0).unwrap(),
+    );
+
     let result = match app_state.tennet_api.get_settlement_prices(
         DateTime::from_timestamp(start, 0).unwrap(),
         DateTime::from_timestamp(end, 0).unwrap(),
     ).await {
         Ok(r) => r,
-        Err(err) => {
-            println!("{:?}", err);
+        Err(_) => {
             return records;
         }
     };
@@ -267,8 +279,14 @@ pub async fn sync_settlement_prices (app_state: &AppState) -> Vec<SettlementPric
     }
 
     for records_chunk in records.chunks(PG_MAX_QUERY_PARAMS / RECORD_COLUMNS) {
-        let result = settlement_prices::insert_many(&app_state.db_client, records_chunk).await;
-        println!("{:?}", result);
+        match settlement_prices::insert_many(&app_state.db_client, records_chunk).await {
+            Ok(rows_affected) => {
+                tracing::info!("inserted {} records into settlement prices db", rows_affected);
+            },
+            Err(err) => {
+                tracing::error!("{:#?}", err);
+            }
+        }
     }
 
     records

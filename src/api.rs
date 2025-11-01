@@ -1,9 +1,11 @@
 use serde::Serialize;
 use axum::{
     extract::{rejection::JsonRejection, FromRequest},
-    http::StatusCode, response::{IntoResponse, Response},
-    Router
+    http::{StatusCode, Method},
+    response::{IntoResponse, Response},
+    Router,
 };
+use tower_http::cors::{CorsLayer, Any};
 use crate::AppState;
 
 mod tennet;
@@ -16,7 +18,12 @@ pub enum AppError {
 pub fn setup_routes (app_state: AppState) -> Router {
 
     let app = Router::new()
-        .nest("/tennet", tennet::tennet_router(app_state.clone()));
+        .nest("/tennet", tennet::tennet_router(app_state.clone()))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods([Method::GET])
+        );
 
     app
 }

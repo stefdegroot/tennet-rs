@@ -15,7 +15,7 @@ pub async fn get_merit_order(
     State(state): State<AppState>,
 ) -> Result<AppJson<Vec<db::merit_order::MeritOrderList>>, AppError> {
 
-    println!("get_merit_order: {:#?}", params);
+    tracing::info!("/tennet/merit-order: {:#?}", params);
 
     let date_from = match params.get("date_from") {
         Some(date) => DateTime::<Utc>::from_str(&date).unwrap(),

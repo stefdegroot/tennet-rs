@@ -2,6 +2,7 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 use crate::AppState;
 
 mod balance_delta;
+mod frr_activations;
 mod merit_order;
 mod settlement_prices;
 

@@ -2,15 +2,17 @@ use reqwest::{Client, header, Url};
 use serde::{Deserialize, de::DeserializeOwned};
 use anyhow::{Result, anyhow};
 use balance_delta::BalanceDeltaPoint;
+use frr_activations::FrrActivationsPoint;
 use settlement_prices::SettlementPricePoint;
 use chrono::{DateTime, Utc};
 
 use crate::config::CONFIG;
 
 pub mod balance_delta;
+pub mod frr_activations;
 pub mod merit_order;
 pub mod settlement_prices;
-pub mod time;
+pub mod utils;
 
 pub struct TennetApi {
     api_key: String,
@@ -136,8 +138,8 @@ impl TennetApi {
         let response = self.request::<BalanceDeltaPoint>(
             "/v1/balance-delta",
             &[
-                ("date_from", &time::create_tennet_time_stamp(from)),
-                ("date_to", &time::create_tennet_time_stamp(to)),
+                ("date_from", &utils::time::create_tennet_time_stamp(from)),
+                ("date_to", &utils::time::create_tennet_time_stamp(to)),
             ]
         ).await?;
 
@@ -149,8 +151,8 @@ impl TennetApi {
         let response = self.request::<merit_order::MeritOrderPoint>(
             "/v1/merit-order-list",
             &[
-                ("date_from", &time::create_tennet_time_stamp(from)),
-                ("date_to", &time::create_tennet_time_stamp(to)),
+                ("date_from", &utils::time::create_tennet_time_stamp(from)),
+                ("date_to", &utils::time::create_tennet_time_stamp(to)),
             ]
         ).await?;
 
@@ -162,8 +164,21 @@ impl TennetApi {
         let response = self.request::<SettlementPricePoint>(
             "/v1/settlement-prices",
             &[
-                ("date_from", &time::create_tennet_time_stamp(from)),
-                ("date_to", &time::create_tennet_time_stamp(to)),
+                ("date_from", &utils::time::create_tennet_time_stamp(from)),
+                ("date_to", &utils::time::create_tennet_time_stamp(to)),
+            ]
+        ).await?;
+
+        Ok(response)
+    }
+
+    pub async fn get_frr_activations (&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Result<TennetResponse<FrrActivationsPoint>> {
+
+        let response = self.request::<FrrActivationsPoint>(
+            "/publications/v1/frequency-restoration-reserve-activations",
+            &[
+                ("date_from", &utils::time::create_tennet_time_stamp(from)),
+                ("date_to", &utils::time::create_tennet_time_stamp(to)),
             ]
         ).await?;
 

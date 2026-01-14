@@ -2,15 +2,16 @@ use chrono::{offset::LocalResult, DateTime, TimeZone, Utc};
 use chrono_tz::Europe::Amsterdam;
 use chrono_tz::Tz;
 
-pub fn create_tennet_time_stamp (utc: DateTime<Utc>) -> String {
+/// Creates a Tennet API formatted timestamp string from UTC DateTime
+pub fn create_tennet_time_stamp(utc: DateTime<Utc>) -> String {
     Amsterdam
         .from_utc_datetime(&utc.naive_utc())
         .format("%d-%m-%Y %H:%M:%S")
         .to_string()
 }
 
-pub fn parse_tennet_time_stamp (time_string: &str) -> LocalResult<DateTime<Tz>> {
-
+/// Parses a Tennet timestamp string and returns a DateTime in Amsterdam timezone
+pub fn parse_tennet_time_stamp(time_string: &str) -> LocalResult<DateTime<Tz>> {
     let split = time_string.splitn(2, "-").collect::<Vec<&str>>();
 
     let year = split[0].parse::<i32>().unwrap();

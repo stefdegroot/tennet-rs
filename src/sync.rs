@@ -11,9 +11,10 @@ use crate::{
 
 pub fn sync_service (app_state: AppState) {
 
-    let _ = schedule_tasks(ScheduleGranularity::Seconds, &[5],app_state.clone(), balance_delta_service, "balance_delta");
-    let _ = schedule_tasks(ScheduleGranularity::Minutes, &[1, 16, 31, 46],app_state.clone(), merit_order_service, "merit_order");
-    let _ = schedule_tasks(ScheduleGranularity::Minutes, &[5],app_state.clone(), settlement_prices_service, "settlement_prices");
+    let _ = schedule_tasks(ScheduleGranularity::SECONDS, &[5],app_state.clone(), balance_delta_service, "balance_delta");
+    let _ = schedule_tasks(ScheduleGranularity::MINUTES, &[1, 16, 31, 46],app_state.clone(), merit_order_service, "merit_order");
+    let _ = schedule_tasks(ScheduleGranularity::MINUTES, &[5],app_state.clone(), settlement_prices_service, "settlement_prices");
+    let _ = schedule_tasks(ScheduleGranularity::MINUTES, &[5],app_state.clone(), frr_activations_service, "frr_activations");
 
 }
 
@@ -55,6 +56,20 @@ fn settlement_prices_service (app_state: AppState) {
 
         if !result.is_empty() {
             app_state.mqtt_client.publish("tennet/settlement-prices", serde_json::ser::to_string(&result).unwrap()).await;
+        }
+    });
+}
+
+fn frr_activations_service (app_state: AppState) {
+    
+    tracing::info!("sync frr activations");
+
+    task::spawn(async move {
+
+        let result = tennet::frr_activations::sync_frr_activations(&app_state).await;
+
+        if result.len() > 0 {
+            app_state.mqtt_client.publish("tennet/frr-activations", serde_json::ser::to_string(&result).unwrap()).await;
         }
     });
 }

@@ -1,13 +1,12 @@
 use serde::Deserialize;
-use std::{io, path::PathBuf};
+use std::path::PathBuf;
 use std::collections::HashSet;
 use chrono::{offset::LocalResult, TimeZone, DateTime, Utc};
 use chrono_tz::Europe::Amsterdam;
 use lazy_static::lazy_static;
 
-use crate::config::CONFIG;
 use crate::AppState;
-use crate::tennet::time::parse_tennet_time_stamp;
+use crate::tennet::utils;
 use crate::db::{
     balance_delta,
     balance_delta::BalanceDeltaRecord,
@@ -89,7 +88,7 @@ pub async fn import_balance_delta (app_state: AppState) {
         )
     }
 
-    let files = get_files().unwrap();
+    let files = utils::get_files("balance_delta");
 
     for (path, name) in files {
         
@@ -158,7 +157,7 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
 
         let row: BalanceDeltaRow = result.unwrap();
 
-        let time =  match parse_tennet_time_stamp(&row.time_interval_start) {
+        let time =  match utils::time::parse_tennet_time_stamp(&row.time_interval_start) {
             LocalResult::Single(t) => Some(t.to_utc()),
             LocalResult::Ambiguous(first, last) => {
 
@@ -185,17 +184,17 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
 
             records.push(BalanceDeltaRecord { 
                 time_stamp, 
-                power_afrr_in: default_to_zero(row.power_afrr_in), 
-                power_afrr_out: default_to_zero(row.power_afrr_out), 
-                power_igcc_in: default_to_zero(row.power_igcc_in), 
-                power_igcc_out: default_to_zero(row.power_igcc_out), 
-                power_mfrrda_in: default_to_zero(row.power_mfrrda_in), 
-                power_mfrrda_out: default_to_zero(row.power_mfrrda_out), 
-                power_picasso_in: default_to_zero(row.power_picasso_in), 
-                power_picasso_out: default_to_zero(row.power_picasso_out), 
+                power_afrr_in: utils::default_to_zero(row.power_afrr_in), 
+                power_afrr_out: utils::default_to_zero(row.power_afrr_out), 
+                power_igcc_in: utils::default_to_zero(row.power_igcc_in), 
+                power_igcc_out: utils::default_to_zero(row.power_igcc_out), 
+                power_mfrrda_in: utils::default_to_zero(row.power_mfrrda_in), 
+                power_mfrrda_out: utils::default_to_zero(row.power_mfrrda_out), 
+                power_picasso_in: utils::default_to_zero(row.power_picasso_in), 
+                power_picasso_out: utils::default_to_zero(row.power_picasso_out), 
                 max_upw_regulation_price: row.max_upw_regulation_price, 
                 min_downw_regulation_price: row.min_downw_regulation_price,
-                mid_price: default_to_zero(row.mid_price),
+                mid_price: utils::default_to_zero(row.mid_price),
             });
         }
     }
@@ -250,7 +249,7 @@ pub async fn sync_balance_delta (app_state: &AppState) -> Vec<BalanceDeltaRecord
 
         for point in time_series.period.points {
 
-            let time =  match parse_tennet_time_stamp(&point.time_interval_start) {
+            let time =  match utils::time::parse_tennet_time_stamp(&point.time_interval_start) {
                 LocalResult::Single(t) => Some(t.to_utc()),
                 LocalResult::Ambiguous(first, last) => {
 
@@ -270,17 +269,17 @@ pub async fn sync_balance_delta (app_state: &AppState) -> Vec<BalanceDeltaRecord
             if let Some(time_stamp) = time {
                 records.push(BalanceDeltaRecord { 
                     time_stamp: time_stamp.timestamp(), 
-                    power_afrr_in: default_string_to_zero(point.power_afrr_in), 
-                    power_afrr_out: default_string_to_zero(point.power_afrr_out), 
-                    power_igcc_in: default_string_to_zero(point.power_igcc_in), 
-                    power_igcc_out: default_string_to_zero(point.power_igcc_out), 
-                    power_mfrrda_in: default_string_to_zero(point.power_mfrrda_in), 
-                    power_mfrrda_out: default_string_to_zero(point.power_mfrrda_out), 
-                    power_picasso_in: default_some_string_to_zero(point.power_picasso_in), 
-                    power_picasso_out: default_some_string_to_zero(point.power_picasso_out), 
-                    max_upw_regulation_price: default_to_zero_option(point.max_upw_regulation_price),
-                    min_downw_regulation_price: default_to_zero_option(point.min_downw_regulation_price),
-                    mid_price: default_string_to_zero(point.mid_price),
+                    power_afrr_in: utils::default_string_to_zero(point.power_afrr_in), 
+                    power_afrr_out: utils::default_string_to_zero(point.power_afrr_out), 
+                    power_igcc_in: utils::default_string_to_zero(point.power_igcc_in), 
+                    power_igcc_out: utils::default_string_to_zero(point.power_igcc_out), 
+                    power_mfrrda_in: utils::default_string_to_zero(point.power_mfrrda_in), 
+                    power_mfrrda_out: utils::default_string_to_zero(point.power_mfrrda_out), 
+                    power_picasso_in: utils::default_some_string_to_zero(point.power_picasso_in), 
+                    power_picasso_out: utils::default_some_string_to_zero(point.power_picasso_out), 
+                    max_upw_regulation_price: utils::default_to_zero_option(point.max_upw_regulation_price),
+                    min_downw_regulation_price: utils::default_to_zero_option(point.min_downw_regulation_price),
+                    mid_price: utils::default_string_to_zero(point.mid_price),
                 });
             };
         }

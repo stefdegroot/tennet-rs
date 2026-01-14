@@ -1,18 +1,17 @@
 use serde::Deserialize;
-use std::{io, path::PathBuf};
+use std::path::PathBuf;
 use chrono::{offset::LocalResult, TimeZone, DateTime, Utc};
 use chrono_tz::Europe::Amsterdam;
 use std::collections::{HashMap, HashSet};
 use lazy_static::lazy_static;
 
 use crate::{
-    config::CONFIG,
     db::{
         merit_order::{self, MeritOrderList, MeritOrderRecord},
         PG_MAX_QUERY_PARAMS,
         RECORD_COLUMNS,
     },
-    tennet::time::parse_tennet_time_stamp,
+    tennet::utils,
     AppState
 };
 
@@ -77,7 +76,7 @@ pub async fn import_merit_order (app_state: AppState) {
         )
     }
 
-    let files = get_files().unwrap();
+    let files = utils::get_files("merit_order");
     
     for (path, name) in files {
         
@@ -141,7 +140,7 @@ pub async fn sync_merit_order (app_state: &AppState) -> Vec<merit_order::MeritOr
 
         for point in time_series.period.points {
 
-             let time =  match parse_tennet_time_stamp(&point.time_interval_start) {
+             let time =  match utils::time::parse_tennet_time_stamp(&point.time_interval_start) {
                 LocalResult::Single(t) => Some(t.to_utc()),
                 LocalResult::Ambiguous(first, last) => {
 
@@ -247,7 +246,7 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
 
         let row: MeritOrderRow = result.unwrap();
 
-        let time =  match parse_tennet_time_stamp(&row.time_interval_start) {
+        let time =  match utils::time::parse_tennet_time_stamp(&row.time_interval_start) {
             LocalResult::Single(t) => Some(t.to_utc()),
             LocalResult::Ambiguous(first, last) => {
 

@@ -1,13 +1,12 @@
 use serde::Deserialize;
-use std::{io, path::PathBuf};
+use std::path::PathBuf;
 use std::collections::HashSet;
 use chrono::{offset::LocalResult, TimeZone, DateTime, Utc};
 use chrono_tz::Europe::Amsterdam;
 use lazy_static::lazy_static;
 use crate::{
-    config::CONFIG,
     AppState,
-    tennet::time::parse_tennet_time_stamp,
+    tennet::utils,
     db::{
         settlement_prices,
         settlement_prices::SettlementPriceRecord,
@@ -81,7 +80,7 @@ pub async fn import_settlement_prices (app_state: AppState) {
         )
     }
 
-    let files = get_files().unwrap();
+    let files = utils::get_files("settlement_prices");
 
     for (path, name) in files {
         
@@ -154,7 +153,7 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
 
         let row: SettlementPriceRow = result.unwrap();
 
-        let time =  match parse_tennet_time_stamp(&row.time_interval_start) {
+        let time =  match utils::time::parse_tennet_time_stamp(&row.time_interval_start) {
             LocalResult::Single(t) => Some(t.to_utc()),
             LocalResult::Ambiguous(first, last) => {
 
@@ -182,8 +181,8 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
 
             records.push(SettlementPriceRecord { 
                 time_stamp,
-                incident_reserve_up: convert_string_bool(row.incident_reserve_up),
-                incident_reserve_down: convert_string_bool(row.incident_reserve_down),
+                incident_reserve_up: utils::convert_string_bool(row.incident_reserve_up),
+                incident_reserve_down: utils::convert_string_bool(row.incident_reserve_down),
                 price_dispatch_up: row.price_dispatch_up,
                 price_dispatch_down: row.price_dispatch_down,
                 price_shortage: row.price_shortage,
@@ -244,7 +243,7 @@ pub async fn sync_settlement_prices (app_state: &AppState) -> Vec<SettlementPric
 
         for point in time_series.period.points {
 
-            let time =  match parse_tennet_time_stamp(&point.time_interval_start) {
+            let time =  match utils::time::parse_tennet_time_stamp(&point.time_interval_start) {
                 LocalResult::Single(t) => Some(t.to_utc()),
                 LocalResult::Ambiguous(first, last) => {
 
@@ -273,12 +272,12 @@ pub async fn sync_settlement_prices (app_state: &AppState) -> Vec<SettlementPric
             if let Some(time_stamp) = time {
                 records.push(SettlementPriceRecord { 
                     time_stamp: time_stamp.timestamp(),
-                    incident_reserve_up: convert_string_bool(point.incident_reserve_up),
-                    incident_reserve_down: convert_string_bool(point.incident_reserve_down),
-                    price_dispatch_up: default_to_zero_option(point.dispatch_up),
-                    price_dispatch_down: default_to_zero_option(point.dispatch_down),
-                    price_shortage: default_string_to_zero(point.shortage),
-                    price_surplus: default_string_to_zero(point.surplus),
+                    incident_reserve_up: utils::convert_string_bool(point.incident_reserve_up),
+                    incident_reserve_down: utils::convert_string_bool(point.incident_reserve_down),
+                    price_dispatch_up: utils::default_to_zero_option(point.dispatch_up),
+                    price_dispatch_down: utils::default_to_zero_option(point.dispatch_down),
+                    price_shortage: utils::default_string_to_zero(point.shortage),
+                    price_surplus: utils::default_string_to_zero(point.surplus),
                     regulation_state: point.regulation_state,
                 });
             }

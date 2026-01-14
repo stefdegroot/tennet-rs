@@ -157,7 +157,7 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
             LocalResult::Single(t) => Some(t.to_utc()),
             LocalResult::Ambiguous(first, last) => {
 
-                let mut time_stamp = first.to_utc();
+                let mut time_stamp: DateTime<Utc> = first.to_utc();
                 let stamp = time_stamp.timestamp();
 
                 if !ambiguous_times.contains(&stamp) {
@@ -247,7 +247,7 @@ pub async fn sync_settlement_prices (app_state: &AppState) -> Vec<SettlementPric
                 LocalResult::Single(t) => Some(t.to_utc()),
                 LocalResult::Ambiguous(first, last) => {
 
-                    let mut time_stamp = first.to_utc();
+                    let mut time_stamp: DateTime<Utc> = first.to_utc();
                     let stamp = time_stamp.timestamp();
 
                     if !ambiguous_times.contains(&stamp) {

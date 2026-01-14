@@ -76,17 +76,24 @@ pub async fn import_balance_delta (app_state: AppState) {
     let latest_record = balance_delta::get_latest(&app_state.db_client).await;
     let mut sync_from = 0;
 
-    println!("{:?}", latest_record);
-
     if let Some(latest) = latest_record {
+        tracing::info!(
+            "latest balance delta record: {:?}",
+            DateTime::from_timestamp(latest.time_stamp, 0).unwrap()
+        );
         sync_from = latest.time_stamp + 60;
+    } else {
+        tracing::info!(
+            "Balance delta db empty, syncing from start of publication {:?}",
+            DateTime::from_timestamp(*FIRST_BALANCE_DATE, 0).unwrap()
+        )
     }
 
     let files = get_files().unwrap();
 
     for (path, name) in files {
         
-        let (start_time, end_time) = get_time_from_file_name(&name);
+        let (_, end_time) = get_time_from_file_name(&name);
 
         if sync_from > end_time {
             continue;

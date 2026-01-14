@@ -40,13 +40,15 @@ pub struct Config {
 
 pub fn load_config () -> Config {
 
-    // let mut path = env::current_dir().unwrap();
-    // path.push("/data/config.toml");
+    let config_path = match env::var("CONFIG_PATH") {
+        Ok(val) => match val.parse::<String>() {
+            Ok(val) => val,
+            Err(_) => "config.toml".to_string(),
+        },
+        Err(_) => "config.toml".to_string(),
+    };
 
-    // println!("{:?}", path);
-
-    // let contents = match fs::read_to_string("/data/config.toml") {
-    let contents = match fs::read_to_string("config.toml") {
+    let contents = match fs::read_to_string(config_path) {
         Ok(c) => c,
         Err(_) => {
             error!("Could not find config.toml file.");

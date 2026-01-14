@@ -64,17 +64,24 @@ pub async fn import_merit_order (app_state: AppState) {
     let latest_record = merit_order::get_latest(&app_state.db_client).await;
     let mut sync_from = 0;
 
-    println!("{:?}", latest_record);
-
     if let Some(latest) = latest_record {
+        tracing::info!(
+            "latest merit order record: {:?}",
+            DateTime::from_timestamp(latest.time_stamp, 0).unwrap()
+        );
         sync_from = latest.time_stamp + 900;
+    } else {
+        tracing::info!(
+            "Merit order db empty, syncing from start of publication {:?}",
+            DateTime::from_timestamp(*FIRST_MERIT_ORDER_DATE, 0).unwrap()
+        )
     }
 
     let files = get_files().unwrap();
     
     for (path, name) in files {
         
-        let (start_time, end_time) = get_time_from_file_name(&name);
+        let (_, end_time) = get_time_from_file_name(&name);
 
         if sync_from > end_time {
             continue;
@@ -184,16 +191,7 @@ pub async fn sync_merit_order (app_state: &AppState) -> Vec<merit_order::MeritOr
         }
     }
 
-    let mut parsed_records = vec![];
-
-    for list in &lists {
-        parsed_records.extend(merit_order_list_to_record(list));
-    }
-
-    for records_chunk in parsed_records.chunks(PG_MAX_QUERY_PARAMS / RECORD_COLUMNS) {
-        let result = merit_order::insert_many(&app_state.db_client, records_chunk).await;
-        println!("{:?}", result);
-    }
+    insert_merit_order(&app_state, &lists).await;
 
     lists
 }
@@ -336,16 +334,7 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
         }
     }
 
-    let mut parsed_records = vec![];
-
-    for list in records {
-        parsed_records.extend(merit_order_list_to_record(&list));
-    }
-
-    for records_chunk in parsed_records.chunks(PG_MAX_QUERY_PARAMS / RECORD_COLUMNS) {
-        let result = merit_order::insert_many(&app_state.db_client, records_chunk).await;
-        println!("{:?}", result);
-    }
+    insert_merit_order(&app_state, &records).await;
 }
 
 fn merit_order_list_to_record (list: &MeritOrderList) -> Vec<MeritOrderRecord> {
@@ -382,4 +371,24 @@ fn merit_order_list_to_record (list: &MeritOrderList) -> Vec<MeritOrderRecord> {
     records.sort_by(|a, b| a.capacity_threshold.partial_cmp(&b.capacity_threshold).unwrap());
 
     records
+}
+
+async fn insert_merit_order (app_state: &AppState, lists: &Vec<MeritOrderList>) {
+
+    let mut parsed_records = vec![];
+
+    for list in lists {
+        parsed_records.extend(merit_order_list_to_record(list));
+    }
+
+    for records_chunk in parsed_records.chunks(PG_MAX_QUERY_PARAMS / RECORD_COLUMNS) {
+        match merit_order::insert_many(&app_state.db_client, records_chunk).await {
+            Ok(rows_affected) => {
+                tracing::info!("inserted {} records into merit order db", rows_affected);
+            },
+            Err(err) => {
+                tracing::error!("{:#?}", err);
+            }
+        }
+    }
 }

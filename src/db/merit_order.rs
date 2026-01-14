@@ -33,7 +33,7 @@ pub async fn create_table (pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
     Ok(())
 }
 
-pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[MeritOrderRecord]) -> Result<(), sqlx::Error> {
+pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[MeritOrderRecord]) -> Result<u64, sqlx::Error> {
 
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(r#"
         INSERT INTO merit_order (
@@ -63,7 +63,7 @@ pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[MeritOrderRecor
 
     tx.commit().await.unwrap();
 
-    Ok(())
+    Ok(result.rows_affected())
 }
 
 fn records_to_list (records: Vec<MeritOrderRecord>) -> Vec<MeritOrderList> {

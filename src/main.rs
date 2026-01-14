@@ -5,7 +5,7 @@ use tennet::TennetApi;
 use notification::MQTT;
 use sync::sync_service;
 use tokio::signal;
-use std::{str::FromStr, sync::Arc};
+use std::{process, str::FromStr, sync::Arc};
 use tracing_subscriber::{prelude::*};
 
 mod config;
@@ -35,7 +35,10 @@ async fn main() {
 
     let mqtt_client = MQTT::init();
 
-    let db_client = db::setup_db().await.unwrap();
+    let db_client = db::setup_db().await.unwrap_or_else( |_| {
+        tracing::error!("Failed to make a connection with the database, exiting process.");
+        process::exit(1);
+    });
 
     let app_state = AppState {
         db_client: Arc::new(db_client),

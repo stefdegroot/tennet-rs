@@ -22,7 +22,7 @@ pub struct FrrActivationsPoint {
     #[serde(rename="timeInterval_end")]
     pub time_interval_end: String,
     #[serde(rename="isp", skip)]
-    pub _isp: Option<String>,  // ignorado: API sempre começa em 1, só indica ordem no array
+    pub _isp: Option<String>,  
     #[serde(rename="aFRR_up")]
     pub afrr_up: String,
     #[serde(rename="aFRR_down")]

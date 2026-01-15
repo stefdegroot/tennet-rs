@@ -175,7 +175,7 @@ impl TennetApi {
     pub async fn get_frr_activations (&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Result<TennetResponse<FrrActivationsPoint>> {
 
         let response = self.request::<FrrActivationsPoint>(
-            "/publications/v1/frequency-restoration-reserve-activations",
+            "/v1/frequency-restoration-reserve-activations",
             &[
                 ("date_from", &utils::time::create_tennet_time_stamp(from)),
                 ("date_to", &utils::time::create_tennet_time_stamp(to)),

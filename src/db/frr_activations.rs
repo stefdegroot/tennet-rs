@@ -5,6 +5,7 @@ use serde::{Serialize, Deserialize};
 #[derive(Clone, Debug, Serialize, Deserialize, FromRow)]
 pub struct FrrActivationsRecord {
     pub time_stamp: i64,
+    pub isp: i32,
     pub afrr_up: f32,
     pub afrr_down: f32,
     pub total_volume: f32,
@@ -30,6 +31,7 @@ pub async fn create_table (pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
     let _r = pool.execute(r#"
         CREATE TABLE IF NOT EXISTS frr_activations (
             time_stamp                  BIGINT NOT NULL PRIMARY KEY,
+            isp                         INTEGER NOT NULL,
             afrr_up                     REAL NOT NULL,
             afrr_down                   REAL NOT NULL,
             total_volume                REAL NOT NULL,
@@ -48,6 +50,7 @@ pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[FrrActivationsR
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(r#"
         INSERT INTO frr_activations (
             time_stamp,
+            isp,
             afrr_up,
             afrr_down,
             total_volume,
@@ -59,6 +62,7 @@ pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[FrrActivationsR
     query_builder.push_values(records, |mut query_builder, record| {
         query_builder
             .push_bind(record.time_stamp)
+            .push_bind(record.isp)
             .push_bind(record.afrr_up)
             .push_bind(record.afrr_down)
             .push_bind(record.total_volume)
@@ -67,19 +71,22 @@ pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[FrrActivationsR
             .push_bind(record.absolute_total_volume);
     });
 
+    query_builder.push(" ON CONFLICT (time_stamp) DO NOTHING");
+
     let query = query_builder.build();
 
     let mut tx = pool
         .begin()
-        .await
-        .map_err(|err| println!("{:?}", err)).unwrap();
+        .await?;
 
+    let result = query.execute(&mut *tx).await?;
+    let rows_affected = result.rows_affected();
 
-    let result = query.execute(&mut *tx).await.unwrap();
+    tracing::debug!("Attempting to insert {} records, {} rows affected", records.len(), rows_affected);
 
-    tx.commit().await.unwrap();
+    tx.commit().await?;
 
-    Ok(result.rows_affected())
+    Ok(rows_affected)
 }
 
 pub async fn get_latest (pool: &Pool<Postgres>) -> Option<FrrActivationsRecord> {
@@ -90,6 +97,13 @@ pub async fn get_latest (pool: &Pool<Postgres>) -> Option<FrrActivationsRecord> 
 
 pub async fn get_range (pool: &Pool<Postgres>, start: i64, end: i64) -> Option<Vec<FrrActivationsRecord>> {
 
+    tracing::debug!("Querying frr_activations: start={} ({:?}), end={} ({:?})", 
+        start, 
+        chrono::DateTime::from_timestamp(start, 0),
+        end,
+        chrono::DateTime::from_timestamp(end, 0)
+    );
+
      let result: Result<Vec<FrrActivationsRecord>, sqlx::Error> = sqlx::query_as(r#"
         SELECT * FROM frr_activations WHERE time_stamp >= $1 AND time_stamp <= $2 ORDER BY time_stamp ASC;
     "#)
@@ -99,9 +113,12 @@ pub async fn get_range (pool: &Pool<Postgres>, start: i64, end: i64) -> Option<V
         .await;
 
     match result {
-        Ok(records) => Some(records),
+        Ok(records) => {
+            tracing::debug!("Found {} records in range", records.len());
+            Some(records)
+        },
         Err(err) => {
-            println!("{:?}", err);
+            tracing::error!("Error querying frr_activations: {:?}", err);
             None
         },
     }
@@ -119,8 +136,15 @@ pub async fn get (pool: &Pool<Postgres>, time_stamp: i64) -> Option<FrrActivatio
     match result {
         Ok(record) => Some(record),
         Err(err) => {
-            println!("{:?}", err);
+            tracing::debug!("Record not found for timestamp {}: {:?}", time_stamp, err);
             None
         },
     }
+}
+
+pub async fn count_total (pool: &Pool<Postgres>) -> Result<i64, sqlx::Error> {
+    let result: Option<i64> = sqlx::query_scalar("SELECT COUNT(*) FROM frr_activations")
+        .fetch_one(pool)
+        .await?;
+    Ok(result.unwrap_or(0))
 }

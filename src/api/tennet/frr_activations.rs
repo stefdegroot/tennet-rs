@@ -53,7 +53,7 @@ pub async fn get_frr_activations(
 
     match data {
         Some(records) => {
-            tracing::info!("Found {} frr_activations records", records.len());
+            tracing::info!("Found {} frr_activations records in requested range", records.len());
             Ok(AppJson(records))
         },
         None => {

@@ -21,6 +21,8 @@ pub struct FrrActivationsPoint {
     pub time_interval_start: String,
     #[serde(rename="timeInterval_end")]
     pub time_interval_end: String,
+    #[serde(rename="isp")]
+    pub isp: Option<String>,
     #[serde(rename="aFRR_up")]
     pub afrr_up: String,
     #[serde(rename="aFRR_down")]
@@ -131,6 +133,7 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
 
             records.push(FrrActivationsRecord { 
                 time_stamp,
+                isp: 0,
                 afrr_up: utils::default_to_zero(row.afrr_up),
                 afrr_down: utils::default_to_zero(row.afrr_down),
                 total_volume: utils::default_to_zero(row.total_volume),
@@ -141,13 +144,17 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
         }
     }
 
-    for records_chunk in records.chunks(PG_MAX_QUERY_PARAMS / RECORD_COLUMNS) {
+    tracing::info!("Processing {} total records to insert (import_csv)", records.len());
+
+    for (chunk_idx, records_chunk) in records.chunks(PG_MAX_QUERY_PARAMS / RECORD_COLUMNS).enumerate() {
+        tracing::debug!("Inserting chunk {} with {} records (import_csv)", chunk_idx + 1, records_chunk.len());
         match frr_activations::insert_many(&app_state.db_client, records_chunk).await {
             Ok(rows_affected) => {
-                tracing::info!("inserted {} records into frr activations db", rows_affected);
+                tracing::info!("Chunk {}: inserted {} records into frr activations db (attempted: {}) (import_csv)", 
+                    chunk_idx + 1, rows_affected, records_chunk.len());
             },
             Err(err) => {
-                tracing::error!("{:#?}", err);
+                tracing::error!("Chunk {}: Error inserting records (import_csv): {:#?}", chunk_idx + 1, err);
             }
         }
     }
@@ -230,6 +237,9 @@ pub async fn sync_frr_activations (app_state: &AppState) -> Vec<FrrActivationsRe
             if let Some(time_stamp) = time {
                 records.push(FrrActivationsRecord { 
                     time_stamp: time_stamp.timestamp(),
+                    isp: point.isp.as_ref()
+                        .and_then(|s| s.parse::<i32>().ok())
+                        .unwrap_or(0),
                     afrr_up: utils::default_string_to_zero(point.afrr_up),
                     afrr_down: utils::default_string_to_zero(point.afrr_down),
                     total_volume: utils::default_string_to_zero(point.total_volume),
@@ -241,13 +251,17 @@ pub async fn sync_frr_activations (app_state: &AppState) -> Vec<FrrActivationsRe
         }
     }
 
-    for records_chunk in records.chunks(PG_MAX_QUERY_PARAMS / RECORD_COLUMNS) {
+    tracing::info!("Processing {} total records to insert", records.len());
+
+    for (chunk_idx, records_chunk) in records.chunks(PG_MAX_QUERY_PARAMS / RECORD_COLUMNS).enumerate() {
+        tracing::debug!("Inserting chunk {} with {} records", chunk_idx + 1, records_chunk.len());
         match frr_activations::insert_many(&app_state.db_client, records_chunk).await {
             Ok(rows_affected) => {
-                tracing::info!("inserted {} records into frr activations db", rows_affected);
+                tracing::info!("Chunk {}: inserted {} records into frr activations db (attempted: {})", 
+                    chunk_idx + 1, rows_affected, records_chunk.len());
             },
             Err(err) => {
-                tracing::error!("{:#?}", err);
+                tracing::error!("Chunk {}: Error inserting records: {:#?}", chunk_idx + 1, err);
             }
         }
     }

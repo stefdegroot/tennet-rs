@@ -72,6 +72,8 @@ pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[SettlementPrice
             .push_bind(record.regulation_state);
     });
 
+    query_builder.push(" ON CONFLICT (time_stamp) DO NOTHING");
+
     let query = query_builder.build();
 
     let mut tx = pool

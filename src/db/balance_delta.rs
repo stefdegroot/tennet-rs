@@ -88,6 +88,8 @@ pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[BalanceDeltaRec
             .push_bind(record.mid_price);
     });
 
+    query_builder.push(" ON CONFLICT (time_stamp) DO NOTHING");
+
     let query = query_builder.build();
 
     let mut tx = pool

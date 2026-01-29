@@ -80,7 +80,7 @@ pub async fn import_merit_order (app_state: AppState) {
     
     for (path, name) in files {
         
-        let (_, end_time) = get_time_from_file_name(&name);
+        let (_, end_time) = utils::get_time_from_file_name(&name, "MERIT_ORDER_LIST_MONTH_", None);
 
         if sync_from > end_time {
             continue;

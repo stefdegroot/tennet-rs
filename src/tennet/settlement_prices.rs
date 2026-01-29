@@ -84,7 +84,7 @@ pub async fn import_settlement_prices (app_state: AppState) {
 
     for (path, name) in files {
         
-        let (_, end_time) = get_time_from_file_name(&name);
+        let (_, end_time) = utils::get_time_from_file_name(&name, "SETTLEMENT_PRICES_MONTH_", Some("SETTLEMENT_PRICES_YEAR_"));
 
         if sync_from > end_time {
             continue;

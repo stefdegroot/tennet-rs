@@ -33,6 +33,21 @@ docker-compose up -d
 ```
 
 ### Building and deploying
+
+#### Clippy
+
+All pull-requests should pass the whole Clippy specification, no errors, warning or suggestions are allowed.
+
+The response from:
+
+```shell
+cargo clippy
+```
+
+should be clean.
+
+#### Docker
+
 docker login rg.nl-ams.scw.cloud/birch-systems -u nologin --password=""
 
 docker build -t birch-systems/tennet:0.0.2 .

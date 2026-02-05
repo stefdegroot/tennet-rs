@@ -1,12 +1,10 @@
 
-use chrono::DateTime;
 use sqlx::{Postgres, Pool};
 use tennet::TennetApi;
-use notification::MQTT;
+use notification::Mqtt;
 use sync::sync_service;
 use tokio::signal;
-use std::{process, str::FromStr, sync::Arc};
-use tracing_subscriber::{prelude::*};
+use std::{process, sync::Arc};
 
 mod config;
 mod tennet;
@@ -19,7 +17,7 @@ mod api;
 pub struct AppState {
     db_client: Arc<Pool<Postgres>>,
     tennet_api: Arc<TennetApi>,
-    mqtt_client: Arc<MQTT>,
+    mqtt_client: Arc<Mqtt>,
 }
 
 #[tokio::main]
@@ -33,7 +31,7 @@ async fn main() {
 
     let tennet_api = tennet::TennetApi::init();
 
-    let mqtt_client = MQTT::init();
+    let mqtt_client = Mqtt::init();
 
     let db_client = db::setup_db().await.unwrap_or_else( |_| {
         tracing::error!("Failed to make a connection with the database, exiting process.");

@@ -20,38 +20,38 @@ pub struct TennetApi {
 
 #[derive(Deserialize, Debug)]
 pub struct TimeSeriesPeriod <T> {
-    #[serde(rename="timeInterval")]
-    time_interval: PeriodTimeInterval,
+    // #[serde(rename="timeInterval")]
+    // time_interval: PeriodTimeInterval,
     #[serde(rename="Points")]
     pub points: Vec<T>
 }
 
 #[derive(Deserialize, Debug)]
 pub struct TimeSeries <T> {
-    #[serde(rename="mRID")]
-    m_rid: i64,
-    #[serde(rename="quantity_Measurement_Unit_name")]
-    quantity_measurement_unit_name: Option<String>,
-    #[serde(rename="price_Measurement_Unit_name")]
-    price_measurement_unit_name: Option<String>,
-    #[serde(rename="currency_Unit_name")]
-    currency_unit_name: String,
+    // #[serde(rename="mRID")]
+    // m_rid: i64,
+    // #[serde(rename="quantity_Measurement_Unit_name")]
+    // quantity_measurement_unit_name: Option<String>,
+    // #[serde(rename="price_Measurement_Unit_name")]
+    // price_measurement_unit_name: Option<String>,
+    // #[serde(rename="currency_Unit_name")]
+    // currency_unit_name: String,
     #[serde(rename="Period")]
     pub period: TimeSeriesPeriod<T>,
 }
 
-#[derive(Deserialize, Debug)]
-pub struct PeriodTimeInterval {
-    start: String,
-    end: String,
-}
+// #[derive(Deserialize, Debug)]
+// pub struct PeriodTimeInterval {
+//     start: String,
+//     end: String,
+// }
 
 #[derive(Deserialize, Debug)]
 pub struct TennetResponseInfo<T> {
-    #[serde(rename="informationType")]
-    information_type: String,
-    #[serde(rename="period.timeInterval")]
-    period_time_interval: PeriodTimeInterval,
+    // #[serde(rename="informationType")]
+    // information_type: String,
+    // #[serde(rename="period.timeInterval")]
+    // period_time_interval: PeriodTimeInterval,
     #[serde(rename="TimeSeries")]
     pub time_series: Vec<TimeSeries<T>>,
 }
@@ -64,8 +64,8 @@ pub struct TennetResponse <T> {
 
 #[derive(Deserialize, Debug)]
 pub struct TennetError {
-    error_date_time: String,
-    error_id: String,
+    // error_date_time: String,
+    // error_id: String,
     error_message: String,
 }
 
@@ -77,8 +77,8 @@ pub struct BasicError {
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 enum TennetAPIResponse <T> {
-    DATA(TennetResponse<T>),
-    ERR(TennetError),
+    Data(TennetResponse<T>),
+    Err(TennetError),
     BasicError(BasicError),
 }
 
@@ -119,8 +119,8 @@ impl TennetApi {
             .await?;
 
         match decoded_response {
-            TennetAPIResponse::DATA(tennet_response) => Ok(tennet_response),
-            TennetAPIResponse::ERR(tennet_error) => {
+            TennetAPIResponse::Data(tennet_response) => Ok(tennet_response),
+            TennetAPIResponse::Err(tennet_error) => {
                 tracing::error!(tennet_error.error_message);
                 Err(anyhow!(tennet_error.error_message))
             },

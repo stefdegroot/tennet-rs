@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use sqlx::{Executor, FromRow, Pool, Postgres, QueryBuilder};
 use serde::{Serialize, Deserialize};
-use std::convert::TryFrom;
 
 #[derive(Clone, Debug, Serialize, Deserialize, FromRow)]
 pub struct BalanceDeltaRecord {
@@ -33,7 +32,7 @@ impl From<BalanceDeltaRecord> for String {
 
 pub async fn create_table (pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
 
-    let r = pool.execute(r#"
+    let _r = pool.execute(r#"
         CREATE TABLE IF NOT EXISTS balance_delta (
             time_stamp                  BIGINT NOT NULL PRIMARY KEY,
             power_afrr_in               REAL NOT NULL,

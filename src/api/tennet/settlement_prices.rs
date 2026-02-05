@@ -8,8 +8,13 @@ use std::{
 };
 use chrono::{Utc, DateTime};
 use crate::db;
-use crate::api::{AppState, AppJson, AppError};
+use crate::api::{AppState, AppJson, AppError, TENNET_TAG};
 
+#[utoipa::path(
+    get,
+    path = "/settlement-prices",
+    tag = TENNET_TAG
+)]
 pub async fn get_settlement_prices(
     Query(params): Query<HashMap<String, String>>,
     State(state): State<AppState>,

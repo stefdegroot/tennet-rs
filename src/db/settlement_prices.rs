@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use sqlx::{Executor, FromRow, Pool, Postgres, QueryBuilder};
 use serde::{Serialize, Deserialize};
-use std::convert::TryFrom;
 
 #[derive(Clone, Debug, Serialize, Deserialize, FromRow)]
 pub struct SettlementPriceRecord {
@@ -29,7 +28,7 @@ impl From<SettlementPriceRecord> for String {
 
 pub async fn create_table (pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
 
-    let r = pool.execute(r#"
+    let _r = pool.execute(r#"
         CREATE TABLE IF NOT EXISTS settlement_prices (
             time_stamp                  BIGINT NOT NULL PRIMARY KEY,
             incident_reserve_up         BOOL NOT NULL,

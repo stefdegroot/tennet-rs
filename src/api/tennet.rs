@@ -9,12 +9,9 @@ mod merit_order;
 mod settlement_prices;
 
 pub fn tennet_router (app_state: AppState) -> Router {
-
-    let routes = Router::new()
+    Router::new()
         .route("/balance-delta", get(balance_delta::get_balance_delta))
         .route("/merit-order", get(merit_order::get_merit_order))
         .route("/settlement-prices", get(settlement_prices::get_settlement_prices))
-        .with_state(app_state);
-
-    routes
+        .with_state(app_state)
 }

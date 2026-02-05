@@ -18,7 +18,7 @@ pub async fn get_settlement_prices(
     tracing::info!("/tennet/settlement-prices: {:#?}", params);
 
     let date_from = match params.get("date_from") {
-        Some(date) => DateTime::<Utc>::from_str(&date).unwrap(),
+        Some(date) => DateTime::<Utc>::from_str(date).unwrap(),
         None => {
             println!("date_from query param missing");
             return Err(AppError::BasicError((StatusCode::BAD_REQUEST, "date_from query param missing")))
@@ -26,7 +26,7 @@ pub async fn get_settlement_prices(
     };
 
     let date_to = match params.get("date_to") {
-        Some(date) => DateTime::<Utc>::from_str(&date).unwrap(),
+        Some(date) => DateTime::<Utc>::from_str(date).unwrap(),
         None => {
             println!("date_to query param missing");
             return Err(AppError::BasicError((StatusCode::BAD_REQUEST, "date_to query param missing")))

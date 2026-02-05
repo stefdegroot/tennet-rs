@@ -21,8 +21,8 @@ pub struct SettlementPricePoint {
     #[serde(rename="timeInterval_start")]
     pub time_interval_start: String,
     #[serde(rename="timeInterval_end")]
-    pub time_interval_end: String,
-    pub isp: String,
+    // pub time_interval_end: String,
+    // pub isp: String,
     pub incident_reserve_up: String,
     pub incident_reserve_down: String,
     pub dispatch_up: Option<String>,
@@ -30,17 +30,17 @@ pub struct SettlementPricePoint {
     pub shortage: String,
     pub surplus: String,
     pub regulation_state: i32,
-    pub regulating_condition: String
+    // pub regulating_condition: String
 }
 
 #[derive(Deserialize, Debug)]
 pub struct SettlementPriceRow {
     #[serde(rename="Timeinterval Start Loc")]
     pub time_interval_start: String,
-    #[serde(rename="Timeinterval End Loc")]
-    pub time_interval_end: String,
-    #[serde(rename="Isp")]
-    pub isp: i32,
+    // #[serde(rename="Timeinterval End Loc")]
+    // pub time_interval_end: String,
+    // #[serde(rename="Isp")]
+    // pub isp: i32,
     #[serde(rename="Incident Reserve Up")]
     pub incident_reserve_up: String,
     #[serde(rename="Incident Reserve Down")]
@@ -55,8 +55,8 @@ pub struct SettlementPriceRow {
     pub price_surplus: f32,
     #[serde(rename="Regulation State")]
     pub regulation_state: i32,
-    #[serde(rename="Regulating Condition")]
-    pub regulating_condition: String,
+    // #[serde(rename="Regulating Condition")]
+    // pub regulating_condition: String,
 }
 
 lazy_static! {
@@ -107,7 +107,7 @@ fn get_files () -> io::Result<Vec<(PathBuf, String)>>  {
     Ok(files)
 }
 
-fn get_time_from_file_name (filename: &String) -> (i64, i64) {
+fn get_time_from_file_name (filename: &str) -> (i64, i64) {
 
     let year: i32;
     let month: u32;
@@ -132,10 +132,10 @@ fn get_time_from_file_name (filename: &String) -> (i64, i64) {
         0
     );
 
-    return (
+    (
         start_time.earliest().unwrap().timestamp(),
         end_time.earliest().unwrap().timestamp(),
-    );
+    )
 }
 
 async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
@@ -255,7 +255,7 @@ pub async fn sync_settlement_prices (app_state: &AppState) -> Vec<SettlementPric
 
                         let existing_record = settlement_prices::get(&app_state.db_client, stamp).await;
 
-                        if let Some(_) = existing_record {
+                        if existing_record.is_some() {
                             time_stamp = last.to_utc();
                         } else {
                             ambiguous_times.insert(stamp);
@@ -300,27 +300,17 @@ pub async fn sync_settlement_prices (app_state: &AppState) -> Vec<SettlementPric
 }
 
 fn convert_string_bool (bool: String) -> bool {
-    if bool == "YES" {
-        true
-    } else {
-        false
-    }
+    bool == "YES"
 }
 
 fn default_to_zero_option (option: Option<String>) -> Option<f32> {
     if let Some(string) = option {
-        match string.parse() {
-            Ok(n) => Some(n),
-            Err(_) => None,
-        }
+        string.parse().ok()
     } else {
         None
     }
 }
 
 fn default_string_to_zero (string: String) -> f32 {
-    match string.parse() {
-        Ok(n) => n,
-        Err(_) => 0.0,
-    }
+    string.parse().unwrap_or(0.0)
 }

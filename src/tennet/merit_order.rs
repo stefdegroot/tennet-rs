@@ -17,7 +17,7 @@ use crate::{
 };
 
 #[derive(Deserialize, Debug)]
-struct MeritOrderPointThreshold {
+pub struct MeritOrderPointThreshold {
     capacity_threshold: String,
     price_up: Option<String>,
     price_down: Option<String>,
@@ -27,8 +27,8 @@ struct MeritOrderPointThreshold {
 pub struct MeritOrderPoint {
     #[serde(rename="timeInterval_start")]
     pub time_interval_start: String,
-    #[serde(rename="timeInterval_end")]
-    pub time_interval_end: String,
+    // #[serde(rename="timeInterval_end")]
+    // pub time_interval_end: String,
     #[serde(rename="Thresholds")]
     pub thresholds: Vec<MeritOrderPointThreshold>,
 }
@@ -152,7 +152,7 @@ pub async fn sync_merit_order (app_state: &AppState) -> Vec<merit_order::MeritOr
 
                         let existing_list = merit_order::get(&app_state.db_client, stamp).await;
 
-                        if let Some(_) = existing_list {
+                        if existing_list.is_some() {
                             time_stamp = last.to_utc();
                         } else {
                             ambiguous_times.insert(stamp);
@@ -191,7 +191,7 @@ pub async fn sync_merit_order (app_state: &AppState) -> Vec<merit_order::MeritOr
         }
     }
 
-    insert_merit_order(&app_state, &lists).await;
+    insert_merit_order(app_state, &lists).await;
 
     lists
 }
@@ -206,7 +206,7 @@ fn get_files () -> io::Result<Vec<(PathBuf, String)>>  {
     Ok(files)
 }
 
-fn get_time_from_file_name (filename: &String) -> (i64, i64) {
+fn get_time_from_file_name (filename: &str) -> (i64, i64) {
 
     let split: Vec<&str> = filename.split("MERIT_ORDER_LIST_MONTH_").collect();
 
@@ -223,10 +223,10 @@ fn get_time_from_file_name (filename: &String) -> (i64, i64) {
         0
     );
 
-    return (
+    (
         start_time.earliest().unwrap().timestamp(),
         end_time.earliest().unwrap().timestamp(),
-    );
+    )
 }
 
 async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
@@ -334,7 +334,7 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
         }
     }
 
-    insert_merit_order(&app_state, &records).await;
+    insert_merit_order(app_state, &records).await;
 }
 
 fn merit_order_list_to_record (list: &MeritOrderList) -> Vec<MeritOrderRecord> {

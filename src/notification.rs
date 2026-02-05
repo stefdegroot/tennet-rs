@@ -3,11 +3,11 @@ use rumqttc::v5::{mqttbytes::QoS, AsyncClient, MqttOptions};
 use tokio::task;
 use crate::config::CONFIG;
 
-pub struct MQTT {
+pub struct Mqtt {
     client: AsyncClient
 }
 
-impl MQTT {
+impl Mqtt {
 
     pub fn init () -> Self {
 
@@ -26,17 +26,17 @@ impl MQTT {
             loop {
                 let event = eventloop.poll().await;
                 match &event {
-                    Ok(v) => {
+                    Ok(_v) => {
                         // println!("Event = {v:?}");
                     }
-                    Err(e) => {
+                    Err(_e) => {
                         // println!("Error = {e:?}");
                     }
                 }
             }
         });
 
-        MQTT {
+        Mqtt {
             client,
         }
     }

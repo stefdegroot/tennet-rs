@@ -19,7 +19,7 @@ pub struct MeritOrderList {
 
 pub async fn create_table (pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
 
-    let r = pool.execute(r#"
+    let _r = pool.execute(r#"
         CREATE TABLE IF NOT EXISTS merit_order (
             time_stamp              BIGINT NOT NULL,
             capacity_threshold      REAL NOT NULL,
@@ -70,7 +70,7 @@ fn records_to_list (records: Vec<MeritOrderRecord>) -> Vec<MeritOrderList> {
 
     let mut lists  = vec![];
 
-    if records.len() == 0 {
+    if records.is_empty() {
         return lists;
     }
 
@@ -105,7 +105,7 @@ fn records_to_list (records: Vec<MeritOrderRecord>) -> Vec<MeritOrderList> {
         last_time_stamp = Some(r.time_stamp)
     }
     
-    if merit_order_list.upward.len() > 0 || merit_order_list.downward.len() > 0 {
+    if !merit_order_list.upward.is_empty() || !merit_order_list.downward.is_empty() {
         lists.push(merit_order_list);
     }
 
@@ -121,7 +121,7 @@ pub async fn get_latest (pool: &Pool<Postgres>) -> Option<MeritOrderList> {
     match latest_records {
         Ok(records) => {
 
-            let latest_record = records_to_list(records).into_iter().nth(0);
+            let latest_record = records_to_list(records).into_iter().next();
 
             if let Some(latest) = latest_record {
                 get(pool, latest.time_stamp).await
@@ -165,7 +165,7 @@ pub async fn get (pool: &Pool<Postgres>, time_stamp: i64) -> Option<MeritOrderLi
         .await;
 
     match latest_records {
-        Ok(records) => records_to_list(records).into_iter().nth(0),
+        Ok(records) => records_to_list(records).into_iter().next(),
         Err(err) => {
             println!("{:?}", err);
             None

@@ -11,9 +11,9 @@ use crate::{
 
 pub fn sync_service (app_state: AppState) {
 
-    let _ = schedule_tasks(ScheduleGranularity::SECONDS, &[5],app_state.clone(), balance_delta_service, "balance_delta");
-    let _ = schedule_tasks(ScheduleGranularity::MINUTES, &[1, 16, 31, 46],app_state.clone(), merit_order_service, "merit_order");
-    let _ = schedule_tasks(ScheduleGranularity::MINUTES, &[5],app_state.clone(), settlement_prices_service, "settlement_prices");
+    let _ = schedule_tasks(ScheduleGranularity::Seconds, &[5],app_state.clone(), balance_delta_service, "balance_delta");
+    let _ = schedule_tasks(ScheduleGranularity::Minutes, &[1, 16, 31, 46],app_state.clone(), merit_order_service, "merit_order");
+    let _ = schedule_tasks(ScheduleGranularity::Minutes, &[5],app_state.clone(), settlement_prices_service, "settlement_prices");
 
 }
 
@@ -25,7 +25,7 @@ fn balance_delta_service (app_state: AppState) {
         
         let result = tennet::balance_delta::sync_balance_delta(&app_state).await;
 
-        if result.len() > 0 {
+        if !result.is_empty() {
             app_state.mqtt_client.publish("tennet/balance-delta", serde_json::ser::to_string(&result).unwrap()).await;
         }
     });
@@ -39,7 +39,7 @@ fn merit_order_service (app_state: AppState) {
 
         let result = tennet::merit_order::sync_merit_order(&app_state).await;
 
-        if result.len() > 0 {
+        if !result.is_empty() {
             app_state.mqtt_client.publish("tennet/merit-order", serde_json::ser::to_string(&result).unwrap()).await;
         }
     });
@@ -53,7 +53,7 @@ fn settlement_prices_service (app_state: AppState) {
 
         let result = tennet::settlement_prices::sync_settlement_prices(&app_state).await;
 
-        if result.len() > 0 {
+        if !result.is_empty() {
             app_state.mqtt_client.publish("tennet/settlement-prices", serde_json::ser::to_string(&result).unwrap()).await;
         }
     });
@@ -64,8 +64,8 @@ const SECONDS_TO_NANO: u64 = u64::pow(10, 9);
 
 #[derive(Clone, Copy, Debug)]
 enum ScheduleGranularity {
-    SECONDS,
-    MINUTES,
+    Seconds,
+    Minutes,
 }
 
 fn schedule_tasks<T: Send + Clone + 'static>(granularity: ScheduleGranularity, offsets: &[u64], ctx: T, callback: fn (ctx: T) -> (), name: &'static str) -> impl FnOnce() {
@@ -84,10 +84,10 @@ fn schedule_tasks<T: Send + Clone + 'static>(granularity: ScheduleGranularity, o
             loop {
     
                 let utc = Utc::now();
-                let mut wait = 0;
+                let wait;
 
                 match &granularity {
-                    ScheduleGranularity::SECONDS => {
+                    ScheduleGranularity::Seconds => {
 
                         let mark = offset * SECONDS_TO_NANO;
                         let seconds = utc.second() as u64;
@@ -100,7 +100,7 @@ fn schedule_tasks<T: Send + Clone + 'static>(granularity: ScheduleGranularity, o
                             wait = mark - from_start_of_minute;
                         }
                     },
-                    ScheduleGranularity::MINUTES => {
+                    ScheduleGranularity::Minutes => {
 
                         let mark = offset * 60 * SECONDS_TO_NANO;
                         let nano = utc.nanosecond() as u64;
@@ -127,11 +127,9 @@ fn schedule_tasks<T: Send + Clone + 'static>(granularity: ScheduleGranularity, o
         }));
     }
 
-    let stop_schedule = || {
+    || {
         for task in tasks {
             task.abort();
         }
-    };
-
-    stop_schedule
+    }
 }

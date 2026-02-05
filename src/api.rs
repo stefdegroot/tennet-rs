@@ -16,16 +16,13 @@ pub enum AppError {
 }
 
 pub fn setup_routes (app_state: AppState) -> Router {
-
-    let app = Router::new()
+    Router::new()
         .nest("/tennet", tennet::tennet_router(app_state.clone()))
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)
                 .allow_methods([Method::GET])
-        );
-
-    app
+        )
 }
 
 #[derive(FromRequest)]

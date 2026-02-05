@@ -2,7 +2,6 @@ use serde::Deserialize;
 use tracing::error;
 use std::{fs, env};
 use std::process::exit;
-use toml;
 use lazy_static::lazy_static;
 
 #[derive(Deserialize, Debug, Clone)]

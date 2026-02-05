@@ -19,9 +19,9 @@ use crate::db::{
 pub struct BalanceDeltaPoint {
     #[serde(rename="timeInterval_start")]
     pub time_interval_start: String,
-    #[serde(rename="timeInterval_end")]
-    pub time_interval_end: String,
-    pub sequence: String,
+    // #[serde(rename="timeInterval_end")]
+    // pub time_interval_end: String,
+    // pub sequence: String,
     pub power_afrr_in: String,
     pub power_afrr_out: String,
     pub power_igcc_in: String,
@@ -106,11 +106,7 @@ pub async fn import_balance_delta (app_state: AppState) {
 }
 
 fn default_to_zero (option: Option<f32>) -> f32 {
-    if let Some(n) = option {
-        n
-    } else {
-        0.0
-    }
+    option.unwrap_or(0.0)
 }
 
 fn get_files () -> io::Result<Vec<(PathBuf, String)>>  {
@@ -123,7 +119,7 @@ fn get_files () -> io::Result<Vec<(PathBuf, String)>>  {
     Ok(files)
 }
 
-fn get_time_from_file_name (filename: &String) -> (i64, i64) {
+fn get_time_from_file_name (filename: &str) -> (i64, i64) {
 
     let split: Vec<&str> = filename.split("BALANCE_DELTA_MONTH_").collect();
 
@@ -140,10 +136,10 @@ fn get_time_from_file_name (filename: &String) -> (i64, i64) {
         0
     );
 
-    return (
+    (
         start_time.earliest().unwrap().timestamp(),
         end_time.earliest().unwrap().timestamp(),
-    );
+    )
 }
 
 async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
@@ -262,7 +258,7 @@ pub async fn sync_balance_delta (app_state: &AppState) -> Vec<BalanceDeltaRecord
 
                     let existing_record = balance_delta::get(&app_state.db_client, time_stamp.timestamp()).await;
 
-                    if let Some(_) = existing_record {
+                    if existing_record.is_some() {
                         time_stamp = last.to_utc();
                     }
 
@@ -306,20 +302,14 @@ pub async fn sync_balance_delta (app_state: &AppState) -> Vec<BalanceDeltaRecord
 
 fn default_to_zero_option (option: Option<String>) -> Option<f32> {
     if let Some(string) = option {
-        match string.parse() {
-            Ok(n) => Some(n),
-            Err(_) => None,
-        }
+       string.parse().ok()
     } else {
         None
     }
 }
 
 fn default_string_to_zero (string: String) -> f32 {
-    match string.parse() {
-        Ok(n) => n,
-        Err(_) => 0.0,
-    }
+    string.parse().unwrap_or(0.0)
 }
 
 fn default_some_string_to_zero (option: Option<String>) -> f32 {

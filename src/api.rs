@@ -4,6 +4,7 @@ use axum::{
     http::{StatusCode, Method},
     response::{IntoResponse, Response},
     Router,
+    routing::get,
 };
 use tower_http::cors::{CorsLayer, Any};
 use utoipa::OpenApi;
@@ -19,15 +20,15 @@ pub enum AppError {
     BasicError((StatusCode, &'static str)),
 }
 
-pub fn setup_routes (app_state: AppState) -> Router {
+#[derive(OpenApi)]
+#[openapi(
+    tags(
+        (name = TENNET_TAG, description = "TenneT balance data API")
+    )
+)]
+struct ApiDoc;
 
-    #[derive(OpenApi)]
-    #[openapi(
-        tags(
-            (name = TENNET_TAG, description = "TenneT balance data API")
-        )
-    )]
-    struct ApiDoc;
+pub fn setup_routes (app_state: AppState) -> Router {
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/tennet", tennet::tennet_router(app_state.clone()))
@@ -38,7 +39,8 @@ pub fn setup_routes (app_state: AppState) -> Router {
         )
         .split_for_parts();
 
-    println!("{}", api.to_pretty_json().unwrap());
+    let router = router
+        .route("/api-docs/openapi.json", get(api.to_json().unwrap()));
 
     router
 }

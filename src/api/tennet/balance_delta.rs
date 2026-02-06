@@ -22,7 +22,8 @@ pub struct GetBalanceDeltaQuery {
     tag = TENNET_TAG,
     params(GetBalanceDeltaQuery),
     responses(
-        (status = 200, description = "Successful query.", body = [BalanceDeltaRecord])
+        (status = 200, description = "Successful query.", body = [BalanceDeltaRecord]),
+        (status = 400, description = "Bad request.", body = String),
     )
 )]
 pub async fn get_balance_delta(

@@ -12,7 +12,7 @@ services:
       POSTGRES_DB: test_db
     volumes:
       - type: bind
-        source: "/c/Users/stefd/Documenten/Code/rust/tennet/data/postgres"
+        source: "./data/postgres"
         target: /var/lib/postgresql/18/docker
     restart: unless-stopped
 
@@ -37,7 +37,7 @@ services:
       - "9001:9001"
     volumes:
       - type: bind
-        source: "/c/Users/stefd/Documenten/Code/rust/tennet/mosquitto"
+        source: "./mosquitto"
         target: /mosquitto/config
     restart: unless-stopped
 

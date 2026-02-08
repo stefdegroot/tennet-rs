@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use sqlx::{Executor, FromRow, Pool, Postgres, QueryBuilder};
 use serde::{Serialize, Deserialize};
+use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Serialize, Deserialize, FromRow, PartialEq, PartialOrd)]
 pub struct MeritOrderRecord {
@@ -10,7 +11,7 @@ pub struct MeritOrderRecord {
     pub price_up: Option<f32>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct MeritOrderList {
     pub time_stamp: i64,
     pub upward: Vec<(f32, f32)>,

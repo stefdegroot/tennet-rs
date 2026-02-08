@@ -2,34 +2,50 @@ use axum::{
     extract::{Query, State},
     http::StatusCode,
 };
-use std::{
-    collections::HashMap,
-    str::FromStr
-};
+use std::str::FromStr;
+use utoipa::IntoParams;
+use serde::Deserialize;
 use chrono::{Utc, DateTime};
 use crate::db;
-use crate::api::{AppState, AppJson, AppError};
+use crate::db::merit_order::MeritOrderList;
+use crate::api::{AppState, AppJson, AppError, TENNET_TAG};
 
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct GetMeritOrderQuery {
+    date_from: String,
+    date_to: String,
+}
+
+#[utoipa::path(
+    get,
+    path = "/merit-order",
+    tag = TENNET_TAG,
+    params(GetMeritOrderQuery),
+    responses(
+        (status = 200, description = "Successful query.", body = [MeritOrderList]),
+        (status = 400, description = "Bad request.", body = String),
+    )
+)]
 pub async fn get_merit_order(
-    Query(params): Query<HashMap<String, String>>,
+    Query(params): Query<GetMeritOrderQuery>,
     State(state): State<AppState>,
-) -> Result<AppJson<Vec<db::merit_order::MeritOrderList>>, AppError> {
+) -> Result<AppJson<Vec<MeritOrderList>>, AppError> {
 
     tracing::info!("/tennet/merit-order: {:#?}", params);
 
-    let date_from = match params.get("date_from") {
-        Some(date) => DateTime::<Utc>::from_str(date).unwrap(),
-        None => {
-            println!("date_from query param missing");
-            return Err(AppError::BasicError((StatusCode::BAD_REQUEST, "date_from query param missing")))
+    let date_from = match DateTime::<Utc>::from_str(&params.date_from) {
+        Ok(date) => date,
+        Err(err) => {
+            tracing::debug!("/tennet/merit-order:date_from {:?}", err);
+            return Err(AppError::BasicError((StatusCode::BAD_REQUEST, "date_from query param is not in the correct format")))
         },
     };
 
-    let date_to = match params.get("date_to") {
-        Some(date) => DateTime::<Utc>::from_str(date).unwrap(),
-        None => {
-            println!("date_to query param missing");
-            return Err(AppError::BasicError((StatusCode::BAD_REQUEST, "date_to query param missing")))
+    let date_to = match DateTime::<Utc>::from_str(&params.date_to) {
+        Ok(date) => date,
+        Err(err) => {
+            tracing::debug!("/tennet/merit-order:date_from {:?}", err);
+            return Err(AppError::BasicError((StatusCode::BAD_REQUEST, "date_to query param is not in the correct format")))
         },
     };
 

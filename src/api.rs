@@ -4,25 +4,43 @@ use axum::{
     http::{StatusCode, Method},
     response::{IntoResponse, Response},
     Router,
+    routing::get,
 };
 use tower_http::cors::{CorsLayer, Any};
+use utoipa::OpenApi;
+use utoipa_axum::router::OpenApiRouter;
 use crate::AppState;
 
 mod tennet;
+
+const TENNET_TAG: &str = "TenneT";
 
 pub enum AppError {
     JsonRejection(JsonRejection),
     BasicError((StatusCode, &'static str)),
 }
 
+#[derive(OpenApi)]
+#[openapi(
+    tags(
+        (name = TENNET_TAG, description = "TenneT balance data API")
+    )
+)]
+struct ApiDoc;
+
 pub fn setup_routes (app_state: AppState) -> Router {
-    Router::new()
+
+    let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/tennet", tennet::tennet_router(app_state.clone()))
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)
                 .allow_methods([Method::GET])
         )
+        .split_for_parts();
+
+    router
+        .route("/api-docs/openapi.json", get(api.to_json().unwrap()))
 }
 
 #[derive(FromRequest)]

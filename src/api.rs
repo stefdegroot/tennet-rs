@@ -39,10 +39,8 @@ pub fn setup_routes (app_state: AppState) -> Router {
         )
         .split_for_parts();
 
-    let router = router
-        .route("/api-docs/openapi.json", get(api.to_json().unwrap()));
-
     router
+        .route("/api-docs/openapi.json", get(api.to_json().unwrap()))
 }
 
 #[derive(FromRequest)]

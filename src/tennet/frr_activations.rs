@@ -165,15 +165,57 @@ pub async fn sync_frr_activations (app_state: &AppState) -> Vec<FrrActivationsRe
     let latest_record = frr_activations::get_latest(&app_state.db_client).await;
     let mut sync_from = *FIRST_FRR_DATE;
 
-    if let Some(latest) = latest_record {
+    if let Some(latest) = &latest_record {
         sync_from = latest.time_stamp;
+        tracing::info!(
+            "Latest FRR activations record found: timestamp {} ({:?})",
+            latest.time_stamp,
+            DateTime::from_timestamp(latest.time_stamp, 0).unwrap()
+        );
+    } else {
+        tracing::info!(
+            "No existing FRR activations records found, starting from: {:?}",
+            DateTime::from_timestamp(sync_from, 0).unwrap()
+        );
     }
 
     let current_time_stamp = Utc::now().timestamp();
 
     let gap = current_time_stamp - sync_from;
-    let start = sync_from + 900; // 15 mins
-    let end = sync_from + i64::min(gap, 86400) + 900; // max 1 day
+    
+    if gap <= 0 {
+        tracing::warn!(
+            "Gap is negative or zero ({}s). Latest record ({:?}) is newer or equal to current time ({:?}). Skipping sync.",
+            gap,
+            DateTime::from_timestamp(sync_from, 0).unwrap(),
+            DateTime::from_timestamp(current_time_stamp, 0).unwrap()
+        );
+        return vec![];
+    }
+
+    if gap < 900 {
+        tracing::info!(
+            "Gap ({:.2}m) is less than 15 minutes. No new data to sync yet.",
+            gap as f64 / 60.0
+        );
+        return vec![];
+    }
+
+    let start = sync_from + 900;
+    let max_sync_window = i64::min(gap, 86400);
+    let end = sync_from + max_sync_window + 900;
+
+    tracing::info!(
+        "Sync calculation - sync_from: {} ({:?}), current: {} ({:?}), gap: {}s ({:.2}h), max_window: {}s ({:.2}h)",
+        sync_from,
+        DateTime::from_timestamp(sync_from, 0).unwrap(),
+        current_time_stamp,
+        DateTime::from_timestamp(current_time_stamp, 0).unwrap(),
+        gap,
+        gap as f64 / 3600.0,
+        max_sync_window,
+        max_sync_window as f64 / 3600.0
+    );
 
     if start >= end {
         tracing::info!("No new data to sync. Latest: {:?}, Current: {:?}", 
@@ -186,9 +228,12 @@ pub async fn sync_frr_activations (app_state: &AppState) -> Vec<FrrActivationsRe
     let mut records: Vec<FrrActivationsRecord> = vec![];
 
     tracing::info!(
-        "syncing frr activations: {:?} - {:?}",
+        "Syncing FRR activations: start={} ({:?}), end={} ({:?}), duration={:.2}h",
+        start,
         DateTime::from_timestamp(start, 0).unwrap(),
+        end,
         DateTime::from_timestamp(end, 0).unwrap(),
+        (end - start) as f64 / 3600.0
     );
 
     let result = match app_state.tennet_api.get_frr_activations(
@@ -235,23 +280,57 @@ pub async fn sync_frr_activations (app_state: &AppState) -> Vec<FrrActivationsRe
             };
 
             if let Some(time_stamp) = time {
-                records.push(FrrActivationsRecord { 
-                    time_stamp: time_stamp.timestamp(),
-                    isp: point.isp.as_ref()
-                        .and_then(|s| s.parse::<i32>().ok())
-                        .unwrap_or(0),
-                    afrr_up: utils::default_string_to_zero(point.afrr_up),
-                    afrr_down: utils::default_string_to_zero(point.afrr_down),
-                    total_volume: utils::default_string_to_zero(point.total_volume),
-                    mfrrda_volume_up: utils::default_string_to_zero(point.mfrrda_volume_up),
-                    mfrrda_volume_down: utils::default_string_to_zero(point.mfrrda_volume_down),
-                    absolute_total_volume: utils::default_string_to_zero(point.absolute_total_volume),
-                });
+                let timestamp = time_stamp.timestamp();
+                
+                if timestamp >= start && timestamp <= end && timestamp > sync_from {
+                    records.push(FrrActivationsRecord { 
+                        time_stamp: timestamp,
+                        isp: point.isp.as_ref()
+                            .and_then(|s| s.parse::<i32>().ok())
+                            .unwrap_or(0),
+                        afrr_up: utils::default_string_to_zero(point.afrr_up),
+                        afrr_down: utils::default_string_to_zero(point.afrr_down),
+                        total_volume: utils::default_string_to_zero(point.total_volume),
+                        mfrrda_volume_up: utils::default_string_to_zero(point.mfrrda_volume_up),
+                        mfrrda_volume_down: utils::default_string_to_zero(point.mfrrda_volume_down),
+                        absolute_total_volume: utils::default_string_to_zero(point.absolute_total_volume),
+                    });
+                } else {
+                    tracing::debug!(
+                        "Skipping record outside sync range: timestamp {} ({:?}), sync_from: {} ({:?}), start: {} ({:?}), end: {} ({:?})",
+                        timestamp,
+                        DateTime::from_timestamp(timestamp, 0).unwrap(),
+                        sync_from,
+                        DateTime::from_timestamp(sync_from, 0).unwrap(),
+                        start,
+                        DateTime::from_timestamp(start, 0).unwrap(),
+                        end,
+                        DateTime::from_timestamp(end, 0).unwrap()
+                    );
+                }
             }
         }
     }
 
     tracing::info!("Processing {} total records to insert", records.len());
+
+    if records.is_empty() {
+        tracing::info!("No new records to insert, sync complete");
+        return records;
+    }
+
+    let min_timestamp = records.iter().map(|r| r.time_stamp).min();
+    let max_timestamp = records.iter().map(|r| r.time_stamp).max();
+
+    if let Some(min_ts) = min_timestamp {
+        tracing::info!(
+            "Records timestamp range: min={} ({:?}), max={} ({:?})",
+            min_ts,
+            DateTime::from_timestamp(min_ts, 0).unwrap(),
+            max_timestamp.unwrap_or(min_ts),
+            DateTime::from_timestamp(max_timestamp.unwrap_or(min_ts), 0).unwrap()
+        );
+    }
 
     for (chunk_idx, records_chunk) in records.chunks(PG_MAX_QUERY_PARAMS / RECORD_COLUMNS).enumerate() {
         tracing::debug!("Inserting chunk {} with {} records", chunk_idx + 1, records_chunk.len());
@@ -264,6 +343,14 @@ pub async fn sync_frr_activations (app_state: &AppState) -> Vec<FrrActivationsRe
                 tracing::error!("Chunk {}: Error inserting records: {:#?}", chunk_idx + 1, err);
             }
         }
+    }
+
+    if let Some(final_latest) = frr_activations::get_latest(&app_state.db_client).await {
+        tracing::info!(
+            "Sync complete. Latest record after sync: timestamp {} ({:?})",
+            final_latest.time_stamp,
+            DateTime::from_timestamp(final_latest.time_stamp, 0).unwrap()
+        );
     }
 
     records

@@ -76,7 +76,7 @@ pub async fn import_frr_activations (app_state: AppState) {
 
     for (path, name) in files {
         
-        let (start_time, end_time) = utils::get_time_from_file_name(&name, "FRR_ACTIVATIONS_MONTH_", None);
+        let (_start_time, end_time) = utils::get_time_from_file_name(&name, "FRR_ACTIVATIONS_MONTH_", None);
 
         if sync_from > end_time {
             continue;
@@ -109,7 +109,7 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
             LocalResult::Single(t) => Some(t.to_utc()),
             LocalResult::Ambiguous(first, last) => {
 
-                let mut time_stamp = first.to_utc();
+                let mut time_stamp: DateTime<Utc> = first.to_utc();
                 let stamp = time_stamp.timestamp();
 
                 if !ambiguous_times.contains(&stamp) {
@@ -257,7 +257,7 @@ pub async fn sync_frr_activations (app_state: &AppState) -> Vec<FrrActivationsRe
                 LocalResult::Single(t) => Some(t.to_utc()),
                 LocalResult::Ambiguous(first, last) => {
 
-                    let mut time_stamp = first.to_utc();
+                    let mut time_stamp: DateTime<Utc> = first.to_utc();
                     let stamp = time_stamp.timestamp();
 
                     if !ambiguous_times.contains(&stamp) {
@@ -280,7 +280,7 @@ pub async fn sync_frr_activations (app_state: &AppState) -> Vec<FrrActivationsRe
             };
 
             if let Some(time_stamp) = time {
-                let timestamp = time_stamp.timestamp();
+                let timestamp: i64 = time_stamp.timestamp();
                 
                 if timestamp >= start && timestamp <= end && timestamp > sync_from {
                     records.push(FrrActivationsRecord { 

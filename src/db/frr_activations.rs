@@ -1,8 +1,9 @@
 use std::sync::Arc;
 use sqlx::{Executor, FromRow, Pool, Postgres, QueryBuilder};
 use serde::{Serialize, Deserialize};
+use utoipa::ToSchema;
 
-#[derive(Clone, Debug, Serialize, Deserialize, FromRow)]
+#[derive(Clone, Debug, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct FrrActivationsRecord {
     pub time_stamp: i64,
     pub isp: i32,

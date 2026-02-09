@@ -1,3 +1,4 @@
+#[path = "utils/time.rs"]
 pub mod time;
 
 use std::path::PathBuf;

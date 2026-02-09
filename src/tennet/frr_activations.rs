@@ -21,8 +21,8 @@ pub struct FrrActivationsPoint {
     pub time_interval_start: String,
     #[serde(rename="timeInterval_end")]
     pub time_interval_end: String,
-    #[serde(rename="isp")]
-    pub isp: Option<String>,
+    #[serde(rename="isp", skip)]
+    pub _isp: Option<String>,  // ignorado: API sempre começa em 1, só indica ordem no array
     #[serde(rename="aFRR_up")]
     pub afrr_up: String,
     #[serde(rename="aFRR_down")]
@@ -285,9 +285,7 @@ pub async fn sync_frr_activations (app_state: &AppState) -> Vec<FrrActivationsRe
                 if timestamp >= start && timestamp <= end && timestamp > sync_from {
                     records.push(FrrActivationsRecord { 
                         time_stamp: timestamp,
-                        isp: point.isp.as_ref()
-                            .and_then(|s| s.parse::<i32>().ok())
-                            .unwrap_or(0),
+                        isp: 0,  // ignorado na API: sempre começa em 1, só indica ordem no array
                         afrr_up: utils::default_string_to_zero(point.afrr_up),
                         afrr_down: utils::default_string_to_zero(point.afrr_down),
                         total_volume: utils::default_string_to_zero(point.total_volume),

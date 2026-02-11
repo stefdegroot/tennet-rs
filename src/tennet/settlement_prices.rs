@@ -1,14 +1,12 @@
 use serde::Deserialize;
 use std::path::PathBuf;
 use std::collections::HashSet;
-use std::io;
 use chrono::{offset::LocalResult, TimeZone, DateTime, Utc};
 use chrono_tz::Europe::Amsterdam;
 use lazy_static::lazy_static;
 use crate::{
     AppState,
     tennet::utils,
-    config::CONFIG,
     db::{
         settlement_prices,
         settlement_prices::SettlementPriceRecord,
@@ -98,46 +96,6 @@ pub async fn import_settlement_prices (app_state: AppState) {
     }
 }
 
-fn get_files () -> io::Result<Vec<(PathBuf, String)>>  {
-
-    let dir_path = format!("{}/settlement_prices", CONFIG.data.path);
-    let files = std::fs::read_dir(dir_path)?
-        .map(|res| res.map(|e| (e.path(), e.file_name().into_string().unwrap())))
-        .collect::<Result<Vec<_>, io::Error>>()?;
-
-    Ok(files)
-}
-
-fn get_time_from_file_name (filename: &str) -> (i64, i64) {
-
-    let year: i32;
-    let month: u32;
-
-    if filename.starts_with("0") {
-        let split: Vec<&str> = filename.split("0_SETTLEMENT_PRICES_YEAR_").collect();
-        year = split[1].get(0..4).unwrap().parse().unwrap();
-        month = 1;
-    } else {
-        let split: Vec<&str> = filename.split("1_SETTLEMENT_PRICES_MONTH_").collect();
-        year = split[1].get(0..4).unwrap().parse().unwrap();
-        month = split[1].get(5..7).unwrap().parse().unwrap();
-    }
-
-    let start_time = Amsterdam.with_ymd_and_hms(year, month, 1, 0, 0, 0);
-    let end_time = Amsterdam.with_ymd_and_hms(
-        if month < 12 { year } else { year + 1 }, 
-        if month < 12 { month + 1 } else { 1 }, 
-        1,
-        0,
-        0,
-        0
-    );
-
-    (
-        start_time.earliest().unwrap().timestamp(),
-        end_time.earliest().unwrap().timestamp(),
-    )
-}
 
 async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
 
@@ -298,20 +256,4 @@ pub async fn sync_settlement_prices (app_state: &AppState) -> Vec<SettlementPric
     }
 
     records
-}
-
-fn convert_string_bool (bool: String) -> bool {
-    bool == "YES"
-}
-
-fn default_to_zero_option (option: Option<String>) -> Option<f32> {
-    if let Some(string) = option {
-        string.parse().ok()
-    } else {
-        None
-    }
-}
-
-fn default_string_to_zero (string: String) -> f32 {
-    string.parse().unwrap_or(0.0)
 }

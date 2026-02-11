@@ -68,7 +68,7 @@ fn frr_activations_service (app_state: AppState) {
 
         let result = tennet::frr_activations::sync_frr_activations(&app_state).await;
 
-        if result.len() > 0 {
+        if !result.is_empty() {
             app_state.mqtt_client.publish("tennet/frr-activations", serde_json::ser::to_string(&result).unwrap()).await;
         }
     });

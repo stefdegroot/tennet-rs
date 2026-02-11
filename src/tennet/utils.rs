@@ -7,39 +7,18 @@ use crate::config::CONFIG;
 
 /// Converts Option<f32> to f32, returning 0.0 if None
 pub fn default_to_zero(option: Option<f32>) -> f32 {
-    if let Some(n) = option {
-        n
-    } else {
-        0.0
-    }
+    option.unwrap_or(0.0)
 }
 
 /// Converts String to f32, returning 0.0 if parsing fails
 pub fn default_string_to_zero(string: String) -> f32 {
-    match string.parse() {
-        Ok(n) => n,
-        Err(_) => 0.0,
-    }
+    string.parse().unwrap_or(0.0)
 }
 
-/// Converts String to i32, returning 0 if parsing fails
-pub fn default_string_to_int(string: String) -> i32 {
-    match string.parse() {
-        Ok(n) => n,
-        Err(_) => 0,
-    }
-}
 
 /// Converts Option<String> to Option<f32>, returning None if parsing fails
 pub fn default_to_zero_option(option: Option<String>) -> Option<f32> {
-    if let Some(string) = option {
-        match string.parse() {
-            Ok(n) => Some(n),
-            Err(_) => None,
-        }
-    } else {
-        None
-    }
+    option.and_then(|string| string.parse().ok())
 }
 
 /// Converts Option<String> to f32, returning 0.0 if None or if parsing fails
@@ -61,7 +40,7 @@ pub fn convert_string_bool(value: String) -> bool {
 /// Returns an empty vector if the directory does not exist
 pub fn get_files(dir_name: &str) -> Vec<(PathBuf, String)> {
     let dir_path = format!("{}/{}", CONFIG.data.path, dir_name);
-    
+
     match std::fs::read_dir(&dir_path) {
         Ok(entries) => {
             entries
@@ -104,8 +83,8 @@ pub fn get_time_from_file_name(filename: &str, pattern: &str, year_pattern: Opti
 
     let start_time = Amsterdam.with_ymd_and_hms(year, month, 1, 0, 0, 0);
     let end_time = Amsterdam.with_ymd_and_hms(
-        if month < 12 { year } else { year + 1 }, 
-        if month < 12 { month + 1 } else { 1 }, 
+        if month < 12 { year } else { year + 1 },
+        if month < 12 { month + 1 } else { 1 },
         1,
         0,
         0,

@@ -6,7 +6,6 @@ use utoipa::ToSchema;
 #[derive(Clone, Debug, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct FrrActivationsRecord {
     pub time_stamp: i64,
-    pub isp: i32,
     pub afrr_up: f32,
     pub afrr_down: f32,
     pub total_volume: f32,
@@ -32,7 +31,6 @@ pub async fn create_table (pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
     let _r = pool.execute(r#"
         CREATE TABLE IF NOT EXISTS frr_activations (
             time_stamp                  BIGINT NOT NULL PRIMARY KEY,
-            isp                         INTEGER NOT NULL,
             afrr_up                     REAL NOT NULL,
             afrr_down                   REAL NOT NULL,
             total_volume                REAL NOT NULL,
@@ -51,7 +49,6 @@ pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[FrrActivationsR
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(r#"
         INSERT INTO frr_activations (
             time_stamp,
-            isp,
             afrr_up,
             afrr_down,
             total_volume,
@@ -63,7 +60,6 @@ pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[FrrActivationsR
     query_builder.push_values(records, |mut query_builder, record| {
         query_builder
             .push_bind(record.time_stamp)
-            .push_bind(record.isp)
             .push_bind(record.afrr_up)
             .push_bind(record.afrr_down)
             .push_bind(record.total_volume)
@@ -141,11 +137,4 @@ pub async fn get (pool: &Pool<Postgres>, time_stamp: i64) -> Option<FrrActivatio
             None
         },
     }
-}
-
-pub async fn count_total (pool: &Pool<Postgres>) -> Result<i64, sqlx::Error> {
-    let result: Option<i64> = sqlx::query_scalar("SELECT COUNT(*) FROM frr_activations")
-        .fetch_one(pool)
-        .await?;
-    Ok(result.unwrap_or(0))
 }

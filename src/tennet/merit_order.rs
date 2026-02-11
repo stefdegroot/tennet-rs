@@ -1,6 +1,5 @@
 use serde::Deserialize;
 use std::path::PathBuf;
-use std::io;
 use chrono::{offset::LocalResult, TimeZone, DateTime, Utc};
 use chrono_tz::Europe::Amsterdam;
 use std::collections::{HashMap, HashSet};
@@ -13,7 +12,6 @@ use crate::{
         RECORD_COLUMNS,
     },
     tennet::utils,
-    config::CONFIG,
     AppState
 };
 
@@ -195,39 +193,6 @@ pub async fn sync_merit_order (app_state: &AppState) -> Vec<merit_order::MeritOr
     insert_merit_order(app_state, &lists).await;
 
     lists
-}
-
-fn get_files () -> io::Result<Vec<(PathBuf, String)>>  {
-
-    let dir_path = format!("{}/merit_order", CONFIG.data.path);
-    let files = std::fs::read_dir(dir_path)?
-        .map(|res| res.map(|e| (e.path(), e.file_name().into_string().unwrap())))
-        .collect::<Result<Vec<_>, io::Error>>()?;
-
-    Ok(files)
-}
-
-fn get_time_from_file_name (filename: &str) -> (i64, i64) {
-
-    let split: Vec<&str> = filename.split("MERIT_ORDER_LIST_MONTH_").collect();
-
-    let year: i32 = split[1].get(0..4).unwrap().parse().unwrap();
-    let month: u32 = split[1].get(5..7).unwrap().parse().unwrap();
-
-    let start_time = Amsterdam.with_ymd_and_hms(year, month, 1, 0, 0, 0);
-    let end_time = Amsterdam.with_ymd_and_hms(
-        if month < 12 { year } else { year + 1 }, 
-        if month < 12 { month + 1 } else { 1 }, 
-        1,
-        0,
-        0,
-        0
-    );
-
-    (
-        start_time.earliest().unwrap().timestamp(),
-        end_time.earliest().unwrap().timestamp(),
-    )
 }
 
 async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {

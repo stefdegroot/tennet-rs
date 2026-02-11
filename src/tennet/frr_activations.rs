@@ -20,9 +20,10 @@ pub struct FrrActivationsPoint {
     #[serde(rename="timeInterval_start")]
     pub time_interval_start: String,
     #[serde(rename="timeInterval_end")]
+    #[allow(dead_code)]
     pub time_interval_end: String,
-    #[serde(rename="isp", skip)]
-    pub _isp: Option<String>,  
+    #[serde(rename="isp", default)]
+    _isp: Option<u8>,
     #[serde(rename="aFRR_up")]
     pub afrr_up: String,
     #[serde(rename="aFRR_down")]
@@ -41,6 +42,7 @@ struct FrrActivationsRow {
     #[serde(rename="Timeinterval Start Loc")]
     pub time_interval_start: String,
     #[serde(rename="Timeinterval End Loc")]
+    #[allow(dead_code)]
     pub time_interval_end: String,
     #[serde(rename="Afrr Up")]
     pub afrr_up: Option<f32>,
@@ -133,7 +135,6 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
 
             records.push(FrrActivationsRecord { 
                 time_stamp,
-                isp: 0,
                 afrr_up: utils::default_to_zero(row.afrr_up),
                 afrr_down: utils::default_to_zero(row.afrr_down),
                 total_volume: utils::default_to_zero(row.total_volume),
@@ -264,7 +265,7 @@ pub async fn sync_frr_activations (app_state: &AppState) -> Vec<FrrActivationsRe
 
                         let existing_record = frr_activations::get(&app_state.db_client, stamp).await;
 
-                        if let Some(_) = existing_record {
+                        if existing_record.is_some() {
                             time_stamp = last.to_utc();
                         } else {
                             ambiguous_times.insert(stamp);
@@ -285,7 +286,6 @@ pub async fn sync_frr_activations (app_state: &AppState) -> Vec<FrrActivationsRe
                 if timestamp >= start && timestamp <= end && timestamp > sync_from {
                     records.push(FrrActivationsRecord { 
                         time_stamp: timestamp,
-                        isp: 0,  // ignorado na API: sempre começa em 1, só indica ordem no array
                         afrr_up: utils::default_string_to_zero(point.afrr_up),
                         afrr_down: utils::default_string_to_zero(point.afrr_down),
                         total_volume: utils::default_string_to_zero(point.total_volume),

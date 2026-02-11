@@ -88,6 +88,8 @@ pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[BalanceDeltaRec
             .push_bind(record.mid_price);
     });
 
+    query_builder.push(" ON CONFLICT (time_stamp) DO NOTHING");
+
     let query = query_builder.build();
 
     let mut tx = pool
@@ -104,18 +106,9 @@ pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[BalanceDeltaRec
 }
 
 pub async fn get_latest (pool: &Pool<Postgres>) -> Option<BalanceDeltaRecord> {
-
-    let latest: Result<BalanceDeltaRecord, sqlx::Error> = sqlx::query_as(r#"
+    sqlx::query_as(r#"
         SELECT * FROM balance_delta ORDER BY time_stamp DESC LIMIT 1;
-    "#).fetch_one(pool).await;
-
-    match latest {
-        Ok(record) => Some(record),
-        Err(err) => {
-            println!("{:?}", err);
-            None
-        },
-    }
+    "#).fetch_optional(pool).await.ok().flatten()
 }
 
 pub async fn get_range (pool: &Pool<Postgres>, start: i64, end: i64) -> Option<Vec<BalanceDeltaRecord>> {

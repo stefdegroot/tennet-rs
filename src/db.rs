@@ -2,6 +2,7 @@ use crate::config::CONFIG;
 use sqlx::{postgres::PgPoolOptions, Postgres, Pool};
 
 pub mod balance_delta;
+pub mod frr_activations;
 pub mod merit_order;
 pub mod settlement_prices;
 
@@ -23,6 +24,7 @@ pub async fn setup_db () -> Result<Pool<Postgres>, sqlx::Error> {
         .connect(&connection_string).await?;
 
     balance_delta::create_table(&pool).await?;
+    frr_activations::create_table(&pool).await?;
     merit_order::create_table(&pool).await?;
     settlement_prices::create_table(&pool).await?;
 

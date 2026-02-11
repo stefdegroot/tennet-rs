@@ -52,6 +52,8 @@ pub async fn insert_many (pool: &Arc<Pool<Postgres>>, records: &[MeritOrderRecor
             .push_bind(record.price_up);
     });
 
+    query_builder.push(" ON CONFLICT (time_stamp, capacity_threshold) DO NOTHING");
+
     let query = query_builder.build();
 
     let mut tx = pool

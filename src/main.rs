@@ -47,6 +47,7 @@ async fn main() {
     tennet::merit_order::import_merit_order(app_state.clone()).await;
     tennet::balance_delta::import_balance_delta(app_state.clone()).await;
     tennet::settlement_prices::import_settlement_prices(app_state.clone()).await;
+    tennet::frr_activations::import_frr_activations(app_state.clone()).await;
 
     sync_service(app_state.clone());
 

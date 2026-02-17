@@ -1,14 +1,10 @@
-use axum::{
-    extract::{Query, State},
-    http::StatusCode,
-};
-use std::str::FromStr;
-use chrono::{Utc, DateTime};
+use axum::extract::{Query, State};
 use utoipa::IntoParams;
 use serde::Deserialize;
 use crate::db;
 use crate::db::balance_delta::BalanceDeltaRecord;
 use crate::api::{AppState, AppJson, AppError, TENNET_TAG};
+use crate::util::time::iso_string_to_date;
 
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct GetBalanceDeltaQuery {
@@ -33,21 +29,8 @@ pub async fn get_balance_delta(
 
     tracing::info!("/tennet/balance-delta: {:#?}", params);
 
-    let date_from = match DateTime::<Utc>::from_str(&params.date_from) {
-        Ok(date) => date,
-        Err(err) => {
-            tracing::debug!("/tennet/balance-delta:date_from {:?}", err);
-            return Err(AppError::BasicError((StatusCode::BAD_REQUEST, "date_from query param is not in the correct format")))
-        },
-    };
-
-    let date_to = match DateTime::<Utc>::from_str(&params.date_to) {
-        Ok(date) => date,
-        Err(err) => {
-            tracing::debug!("/tennet/balance-delta:date_from {:?}", err);
-            return Err(AppError::BasicError((StatusCode::BAD_REQUEST, "date_to query param is not in the correct format")))
-        },
-    };
+    let date_from = iso_string_to_date(&params.date_from)?;
+    let date_to = iso_string_to_date(&params.date_to)?;
 
     let data = db::balance_delta::get_range(
         &state.db_client, 

@@ -12,6 +12,7 @@ mod db;
 mod sync;
 mod notification;
 mod api;
+mod util;
 
 #[derive(Clone)]
 pub struct AppState {

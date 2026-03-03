@@ -7,7 +7,10 @@ use lazy_static::lazy_static;
 use crate::{
     config::CONFIG,
     AppState,
-    tennet::time::parse_tennet_time_stamp,
+    tennet::{
+        time::parse_tennet_time_stamp,
+        TennetAPIPeriod
+    },
     db::{
         settlement_prices,
         settlement_prices::SettlementPriceRecord,
@@ -16,7 +19,7 @@ use crate::{
     }
 };
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct SettlementPricePoint {
     #[serde(rename="timeInterval_start")]
     pub time_interval_start: String,
@@ -242,7 +245,17 @@ pub async fn sync_settlement_prices (app_state: &AppState) -> Vec<SettlementPric
 
     for time_series in result.response.time_series {
 
-        for point in time_series.period.points {
+        let points = match time_series.period {
+            TennetAPIPeriod::Object(obj) => obj.points,
+            TennetAPIPeriod::Array(array) => {
+                array
+                    .iter()
+                    .flat_map(|v| v.points.clone())
+                    .collect::<Vec<SettlementPricePoint>>()
+            }
+        };
+
+        for point in points {
 
             let time =  match parse_tennet_time_stamp(&point.time_interval_start) {
                 LocalResult::Single(t) => Some(t.to_utc()),

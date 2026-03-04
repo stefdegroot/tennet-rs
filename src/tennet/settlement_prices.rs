@@ -16,7 +16,11 @@ use crate::{
         settlement_prices::SettlementPriceRecord,
         PG_MAX_QUERY_PARAMS,
         RECORD_COLUMNS,
-    }
+    },
+    util::parse::{
+        default_to_zero_option,
+        default_string_to_zero,
+    },
 };
 
 #[derive(Deserialize, Debug, Clone)]
@@ -314,16 +318,4 @@ pub async fn sync_settlement_prices (app_state: &AppState) -> Vec<SettlementPric
 
 fn convert_string_bool (bool: String) -> bool {
     bool == "YES"
-}
-
-fn default_to_zero_option (option: Option<String>) -> Option<f32> {
-    if let Some(string) = option {
-        string.parse().ok()
-    } else {
-        None
-    }
-}
-
-fn default_string_to_zero (string: String) -> f32 {
-    string.parse().unwrap_or(0.0)
 }

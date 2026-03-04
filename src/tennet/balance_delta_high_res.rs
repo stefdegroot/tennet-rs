@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::str::FromStr;
 use serde::Deserialize;
 use chrono::{offset::LocalResult, TimeZone, DateTime, Utc};
 use std::collections::HashSet;
@@ -7,8 +8,15 @@ use lazy_static::lazy_static;
 
 use crate::AppState;
 use crate::tennet::{
-    time::parse_tennet_time_stamp,
+    time::{
+        parse_tennet_time_stamp,
+    },
     TennetAPIPeriod,
+};
+use crate::util::parse::{
+    default_to_zero_option,
+    default_string_to_zero,
+    default_some_string_to_zero,
 };
 use crate::db::{
     balance_delta_high_res,
@@ -17,6 +25,8 @@ use crate::db::{
     RECORD_COLUMNS,
 };
 use crate::util::files::get_files_from_data_folder;
+
+const LATEST_RESPONSE_RANGE: i64 = 1740;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct BalanceDeltaPointHighRes {
@@ -195,11 +205,15 @@ pub async fn sync_balance_delta_high_res (app_state: &AppState) -> Vec<BalanceDe
     let latest_record = balance_delta_high_res::get_latest(&app_state.db_client).await;
     let mut sync_from = *FIRST_HIGH_RES_BALANCE_DATE;
 
+    if let Some(latest) = latest_record {
+        sync_from = latest.time_stamp;
+    }
+
     let current_time_stamp = Utc::now().timestamp();
 
     let gap = current_time_stamp - sync_from;
     let start = sync_from + 12;
-    let end = sync_from + i64::min(gap, 86400) + 12;
+    let end = sync_from + i64::min(gap, 14400) + 12;
 
     tracing::info!(
         "syncing balance delta high res: {:?} - {:?}",
@@ -209,11 +223,24 @@ pub async fn sync_balance_delta_high_res (app_state: &AppState) -> Vec<BalanceDe
 
     let mut records: Vec<BalanceDeltaHighResRecord> = vec![];
 
-    let result = match app_state.tennet_api.get_balance_delta_high_res_latest().await {
-        Ok(r) => r,
-        Err(err) => {
-            tracing::error!("{:?}", err);
-            return records;
+    let result = if gap > LATEST_RESPONSE_RANGE {
+        match app_state.tennet_api.get_balance_delta_high_res(
+            DateTime::from_timestamp(start, 0).unwrap(),
+            DateTime::from_timestamp(end, 0).unwrap(),
+        ).await {
+            Ok(r) => r,
+            Err(err) => {
+                tracing::error!("{:?}", err);
+                return records;
+            }
+        }
+    } else {
+        match app_state.tennet_api.get_balance_delta_high_res_latest().await {
+            Ok(r) => r,
+            Err(err) => {
+                tracing::error!("{:?}", err);
+                return records;
+            }
         }
     };
 
@@ -231,26 +258,35 @@ pub async fn sync_balance_delta_high_res (app_state: &AppState) -> Vec<BalanceDe
 
         for point in points {
 
-            let time =  match parse_tennet_time_stamp(&point.time_interval_start) {
-                LocalResult::Single(t) => Some(t.to_utc()),
-                LocalResult::Ambiguous(first, last) => {
+            let time = if point.time_interval_start.ends_with("Z") {
+                Some(DateTime::<Utc>::from_str(&point.time_interval_start).unwrap().timestamp())
+            } else {
+                match parse_tennet_time_stamp(&point.time_interval_start) {
+                    LocalResult::Single(t) => Some(t.to_utc().timestamp()),
+                    LocalResult::Ambiguous(first, last) => {
 
-                    let mut time_stamp = first.to_utc();
+                        let mut time_stamp = first.to_utc();
 
-                    let existing_record = balance_delta_high_res::get(&app_state.db_client, time_stamp.timestamp()).await;
+                        let existing_record = balance_delta_high_res::get(&app_state.db_client, time_stamp.timestamp()).await;
 
-                    if existing_record.is_some() {
-                        time_stamp = last.to_utc();
-                    }
+                        if existing_record.is_some() {
+                            time_stamp = last.to_utc();
+                        }
 
-                    Some(time_stamp)
-                },
-                LocalResult::None => None
+                        Some(time_stamp.timestamp())
+                    },
+                    LocalResult::None => None
+                }
             };
-
+            
             if let Some(time_stamp) = time {
+
+                if time_stamp < start {
+                    continue;
+                }
+    
                 records.push(BalanceDeltaHighResRecord { 
-                    time_stamp: time_stamp.timestamp(), 
+                    time_stamp, 
                     power_afrr_in: default_string_to_zero(point.power_afrr_in), 
                     power_afrr_out: default_string_to_zero(point.power_afrr_out), 
                     power_igcc_in: default_string_to_zero(point.power_igcc_in), 
@@ -265,31 +301,20 @@ pub async fn sync_balance_delta_high_res (app_state: &AppState) -> Vec<BalanceDe
                     min_downw_regulation_price: default_to_zero_option(point.min_downw_regulation_price),
                     mid_price: default_string_to_zero(point.mid_price),
                 });
-            };
+            }
         }
     }
 
-    println!("{:?}", records);
+    for records_chunk in records.chunks(PG_MAX_QUERY_PARAMS / RECORD_COLUMNS) {
+        match balance_delta_high_res::insert_many(&app_state.db_client, records_chunk).await {
+            Ok(rows_affected) => {
+                tracing::info!("inserted {} records into balance delta high res db", rows_affected);
+            },
+            Err(err) => {
+                tracing::error!("{:#?}", err);
+            }
+        }
+    }
 
     records
-}
-
-fn default_to_zero_option (option: Option<String>) -> Option<f32> {
-    if let Some(string) = option {
-       string.parse().ok()
-    } else {
-        None
-    }
-}
-
-fn default_string_to_zero (string: String) -> f32 {
-    string.parse().unwrap_or(0.0)
-}
-
-fn default_some_string_to_zero (option: Option<String>) -> f32 {
-    if let Some(n) = option {
-        n.parse().unwrap()
-    } else {
-        0.0
-    }
 }

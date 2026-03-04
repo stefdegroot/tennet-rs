@@ -12,6 +12,10 @@ use crate::{
 pub fn sync_service (app_state: AppState) {
 
     let _ = schedule_tasks(ScheduleGranularity::Seconds, &[ 1, 13, 25, 37, 49 ],app_state.clone(), sync_balance_delta_high_res, "balance_delta_high_res");
+    let _ = schedule_tasks(ScheduleGranularity::Seconds, &[5],app_state.clone(), balance_delta_service, "balance_delta");
+    let _ = schedule_tasks(ScheduleGranularity::Minutes, &[1, 16, 31, 46],app_state.clone(), merit_order_service, "merit_order");
+    let _ = schedule_tasks(ScheduleGranularity::Minutes, &[5],app_state.clone(), settlement_prices_service, "settlement_prices");
+
 }
 
 fn sync_balance_delta_high_res (app_state: AppState) {

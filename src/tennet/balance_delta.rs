@@ -11,6 +11,11 @@ use crate::tennet::{
     time::parse_tennet_time_stamp,
     TennetAPIPeriod
 };
+use crate::util::parse::{
+    default_to_zero_option,
+    default_string_to_zero,
+    default_some_string_to_zero,
+};
 use crate::db::{
     balance_delta,
     balance_delta::BalanceDeltaRecord,
@@ -311,24 +316,4 @@ pub async fn sync_balance_delta (app_state: &AppState) -> Vec<BalanceDeltaRecord
     }
 
     records
-}
-
-fn default_to_zero_option (option: Option<String>) -> Option<f32> {
-    if let Some(string) = option {
-       string.parse().ok()
-    } else {
-        None
-    }
-}
-
-fn default_string_to_zero (string: String) -> f32 {
-    string.parse().unwrap_or(0.0)
-}
-
-fn default_some_string_to_zero (option: Option<String>) -> f32 {
-    if let Some(n) = option {
-        n.parse().unwrap()
-    } else {
-        0.0
-    }
 }

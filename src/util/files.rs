@@ -35,13 +35,9 @@ pub fn get_time_from_file_name (base_path: &str, filename: &str) -> (i64, i64) {
         .replace(".csv", "");
     let split: Vec<&str> = date_string.split("-").collect();
 
-    let year: i32 = split.get(0).unwrap().parse().unwrap();
+    let year: i32 = split.first().unwrap().parse().unwrap();
     let month: u32 = split.get(1).unwrap().parse().unwrap();
-    let day: Option<u32> = if let Some(d) = split.get(2) {
-        Some(d.parse().unwrap())
-    } else {
-        None
-    };
+    let day: Option<u32> = split.get(2).map(|d| d.parse().unwrap());
 
     if let Some(day) = day {
 

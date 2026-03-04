@@ -1,5 +1,5 @@
 
-Imbalance market data service on top of the Tennet Publication API.
+Imbalance market data service on top of the [Tennet Publication API](https://developer.tennet.eu/).
 
 **Goals:**
 - convert REST API into a notification/subscription service
@@ -10,6 +10,7 @@ Imbalance market data service on top of the Tennet Publication API.
 
 **api.tennet.eu/publications**
 - [x] Balance Delta
+- [x] Balance Delta High Res
 - [x] Merit Order List
 - [x] Settlement Prices
 - [ ] Emergency Power

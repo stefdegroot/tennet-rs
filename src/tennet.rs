@@ -30,7 +30,7 @@ pub struct TimeSeriesPeriod <T> {
 
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
-enum TennetAPIPeriod <T> {
+pub enum TennetAPIPeriod <T> {
     Object(TimeSeriesPeriod<T>),
     Array(Vec<TimeSeriesPeriod<T>>),
 }

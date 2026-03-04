@@ -19,7 +19,7 @@ pub fn parse_tennet_time_stamp (time_string: &str) -> LocalResult<DateTime<Tz>> 
     let hour = split[1].get(6..8).unwrap().parse::<u32>().unwrap();
     let min = split[1].get(9..11).unwrap().parse::<u32>().unwrap();
 
-    let sec = if split[1].len() == 13 {
+    let sec = if split[1].len() == 14 {
         split[1].get(12..14).unwrap().parse::<u32>().unwrap()
     } else {
         0

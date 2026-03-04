@@ -1,15 +1,17 @@
+use std::path::PathBuf;
+use std::str::FromStr;
 use serde::Deserialize;
-use std::{io, path::PathBuf};
-use std::collections::HashSet;
 use chrono::{offset::LocalResult, TimeZone, DateTime, Utc};
+use std::collections::HashSet;
 use chrono_tz::Europe::Amsterdam;
 use lazy_static::lazy_static;
 
-use crate::config::CONFIG;
 use crate::AppState;
 use crate::tennet::{
-    time::parse_tennet_time_stamp,
-    TennetAPIPeriod
+    time::{
+        parse_tennet_time_stamp,
+    },
+    TennetAPIPeriod,
 };
 use crate::util::parse::{
     default_to_zero_option,
@@ -17,14 +19,17 @@ use crate::util::parse::{
     default_some_string_to_zero,
 };
 use crate::db::{
-    balance_delta,
-    balance_delta::BalanceDeltaRecord,
+    balance_delta_high_res,
+    balance_delta_high_res::BalanceDeltaHighResRecord,
     PG_MAX_QUERY_PARAMS,
     RECORD_COLUMNS,
 };
+use crate::util::files::get_files_from_data_folder;
+
+const LATEST_RESPONSE_RANGE: i64 = 1740;
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct BalanceDeltaPoint {
+pub struct BalanceDeltaPointHighRes {
     #[serde(rename="timeInterval_start")]
     pub time_interval_start: String,
     // #[serde(rename="timeInterval_end")]
@@ -38,13 +43,15 @@ pub struct BalanceDeltaPoint {
     pub power_mfrrda_out: String,
     pub power_picasso_in: Option<String>,
     pub power_picasso_out: Option<String>,
+    pub power_mari_in: Option<String>,
+    pub power_mari_out: Option<String>,
     pub max_upw_regulation_price: Option<String>,
     pub min_downw_regulation_price: Option<String>,
     pub mid_price: String,
 }
 
 #[derive(Deserialize, Debug)]
-struct BalanceDeltaRow {
+struct BalanceDeltaHighResRow {
     #[serde(rename="Timeinterval Start Loc")]
     pub time_interval_start: String,
     // #[serde(rename="Timeinterval End Loc")]
@@ -67,6 +74,10 @@ struct BalanceDeltaRow {
     pub power_picasso_in: Option<f32>,
     #[serde(rename="Picasso Contribution Power Out")]
     pub power_picasso_out: Option<f32>,
+    #[serde(rename="Mari Contribution Power In")]
+    pub power_mari_in: Option<f32>,
+    #[serde(rename="Mari Contribution Power Out")]
+    pub power_mari_out: Option<f32>,
     #[serde(rename="Highest Upward Regulation Price")]
     pub max_upw_regulation_price: Option<f32>,
     #[serde(rename="Lowest Downward Regulation Price")]
@@ -76,32 +87,36 @@ struct BalanceDeltaRow {
 }
 
 lazy_static! {
-    pub static ref FIRST_BALANCE_DATE: i64 = Amsterdam.with_ymd_and_hms(2018, 5, 1, 0, 0, 0).unwrap().timestamp();
+    pub static ref FIRST_HIGH_RES_BALANCE_DATE: i64 = Amsterdam.with_ymd_and_hms(2025, 11, 19, 0, 0, 0).unwrap().timestamp();
 }
 
-pub async fn import_balance_delta (app_state: AppState) {
+pub async fn import_balance_delta_high_res (app_state: AppState) {
 
-    let latest_record = balance_delta::get_latest(&app_state.db_client).await;
+    let latest_record = balance_delta_high_res::get_latest(&app_state.db_client).await;
     let mut sync_from = 0;
 
     if let Some(latest) = latest_record {
         tracing::info!(
-            "latest balance delta record: {:?}",
+            "latest high res balance delta record: {:?}",
             DateTime::from_timestamp(latest.time_stamp, 0).unwrap()
         );
-        sync_from = latest.time_stamp + 60;
+        sync_from = latest.time_stamp + 12;
     } else {
         tracing::info!(
-            "Balance delta db empty, syncing from start of publication {:?}",
-            DateTime::from_timestamp(*FIRST_BALANCE_DATE, 0).unwrap()
+            "High res balance delta db empty, syncing from start of publication {:?}",
+            DateTime::from_timestamp(*FIRST_HIGH_RES_BALANCE_DATE, 0).unwrap()
         )
     }
 
-    let files = get_files().unwrap();
+    let files = match get_files_from_data_folder("balance_delta_high_res") {
+        Ok(f) => f,
+        Err(err) => {
+            tracing::error!("Failed to read high res balance delta data folder {:?}", err);
+            return;
+        }
+    };
 
-    for (path, name) in files {
-        
-        let (_, end_time) = get_time_from_file_name(&name);
+    for (path, name, _, end_time) in files {
 
         if sync_from > end_time {
             continue;
@@ -113,50 +128,13 @@ pub async fn import_balance_delta (app_state: AppState) {
     }
 }
 
-fn default_to_zero (option: Option<f32>) -> f32 {
-    option.unwrap_or(0.0)
-}
-
-fn get_files () -> io::Result<Vec<(PathBuf, String)>>  {
-
-    let dir_path = format!("{}/balance_delta", CONFIG.data.path);
-    let files = std::fs::read_dir(dir_path)?
-        .map(|res| res.map(|e| (e.path(), e.file_name().into_string().unwrap())))
-        .collect::<Result<Vec<_>, io::Error>>()?;
-
-    Ok(files)
-}
-
-fn get_time_from_file_name (filename: &str) -> (i64, i64) {
-
-    let split: Vec<&str> = filename.split("BALANCE_DELTA_MONTH_").collect();
-
-    let year: i32 = split[1].get(0..4).unwrap().parse().unwrap();
-    let month: u32 = split[1].get(5..7).unwrap().parse().unwrap();
-
-    let start_time = Amsterdam.with_ymd_and_hms(year, month, 1, 0, 0, 0);
-    let end_time = Amsterdam.with_ymd_and_hms(
-        if month < 12 { year } else { year + 1 }, 
-        if month < 12 { month + 1 } else { 1 }, 
-        1,
-        0,
-        0,
-        0
-    );
-
-    (
-        start_time.earliest().unwrap().timestamp(),
-        end_time.earliest().unwrap().timestamp(),
-    )
-}
-
 async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
 
-    let mut records: Vec<BalanceDeltaRecord> = vec![];
+    let mut records: Vec<BalanceDeltaHighResRecord> = vec![];
 
     let mut rdr = csv::ReaderBuilder::new()
         .has_headers(true)
-        .delimiter(b';')
+        .delimiter(b',')
         .trim(csv::Trim::Headers)
         .from_path(path).unwrap();
 
@@ -164,7 +142,7 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
 
     for result in rdr.deserialize() {
 
-        let row: BalanceDeltaRow = result.unwrap();
+        let row: BalanceDeltaHighResRow = result.unwrap();
 
         let time =  match parse_tennet_time_stamp(&row.time_interval_start) {
             LocalResult::Single(t) => Some(t.to_utc()),
@@ -191,27 +169,29 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
                 continue;
             }
 
-            records.push(BalanceDeltaRecord { 
+            records.push(BalanceDeltaHighResRecord { 
                 time_stamp, 
-                power_afrr_in: default_to_zero(row.power_afrr_in), 
-                power_afrr_out: default_to_zero(row.power_afrr_out), 
-                power_igcc_in: default_to_zero(row.power_igcc_in), 
-                power_igcc_out: default_to_zero(row.power_igcc_out), 
-                power_mfrrda_in: default_to_zero(row.power_mfrrda_in), 
-                power_mfrrda_out: default_to_zero(row.power_mfrrda_out), 
-                power_picasso_in: default_to_zero(row.power_picasso_in), 
-                power_picasso_out: default_to_zero(row.power_picasso_out), 
+                power_afrr_in: row.power_afrr_in.unwrap_or(0.0), 
+                power_afrr_out: row.power_afrr_out.unwrap_or(0.0), 
+                power_igcc_in: row.power_igcc_in.unwrap_or(0.0), 
+                power_igcc_out: row.power_igcc_out.unwrap_or(0.0), 
+                power_mfrrda_in: row.power_mfrrda_in.unwrap_or(0.0), 
+                power_mfrrda_out: row.power_mfrrda_out.unwrap_or(0.0), 
+                power_picasso_in: row.power_picasso_in.unwrap_or(0.0), 
+                power_picasso_out: row.power_picasso_out.unwrap_or(0.0),
+                power_mari_in: row.power_mari_in.unwrap_or(0.0), 
+                power_mari_out: row.power_mari_out.unwrap_or(0.0), 
                 max_upw_regulation_price: row.max_upw_regulation_price, 
                 min_downw_regulation_price: row.min_downw_regulation_price,
-                mid_price: default_to_zero(row.mid_price),
+                mid_price: row.mid_price.unwrap_or(0.0),
             });
         }
     }
 
     for records_chunk in records.chunks(PG_MAX_QUERY_PARAMS / RECORD_COLUMNS) {
-        match balance_delta::insert_many(&app_state.db_client, records_chunk).await {
+        match balance_delta_high_res::insert_many(&app_state.db_client, records_chunk).await {
             Ok(rows_affected) => {
-                tracing::info!("inserted {} records into balance delta db", rows_affected);
+                tracing::info!("inserted {} records into balance delta high res db", rows_affected);
             },
             Err(err) => {
                 tracing::error!("{:#?}", err);
@@ -220,10 +200,10 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
     }
 }
 
-pub async fn sync_balance_delta (app_state: &AppState) -> Vec<BalanceDeltaRecord> {
+pub async fn sync_balance_delta_high_res (app_state: &AppState) -> Vec<BalanceDeltaHighResRecord> {
 
-    let latest_record = balance_delta::get_latest(&app_state.db_client).await;
-    let mut sync_from = *FIRST_BALANCE_DATE;
+    let latest_record = balance_delta_high_res::get_latest(&app_state.db_client).await;
+    let mut sync_from = *FIRST_HIGH_RES_BALANCE_DATE;
 
     if let Some(latest) = latest_record {
         sync_from = latest.time_stamp;
@@ -232,25 +212,35 @@ pub async fn sync_balance_delta (app_state: &AppState) -> Vec<BalanceDeltaRecord
     let current_time_stamp = Utc::now().timestamp();
 
     let gap = current_time_stamp - sync_from;
-    let start = sync_from + 60;
-    let end = sync_from + i64::min(gap, 86400) + 60;
+    let start = sync_from + 12;
+    let end = sync_from + i64::min(gap, 14400) + 12;
 
     tracing::info!(
-        "syncing balance delta: {:?} - {:?}",
+        "syncing balance delta high res: {:?} - {:?}",
         DateTime::from_timestamp(start, 0).unwrap(),
         DateTime::from_timestamp(end, 0).unwrap(),
     );
 
-    let mut records: Vec<BalanceDeltaRecord> = vec![];
+    let mut records: Vec<BalanceDeltaHighResRecord> = vec![];
 
-    let result = match app_state.tennet_api.get_balance_delta(
-        DateTime::from_timestamp(start, 0).unwrap(),
-        DateTime::from_timestamp(end, 0).unwrap(),
-    ).await {
-        Ok(r) => r,
-        Err(err) => {
-            tracing::error!("{:?}", err);
-            return records;
+    let result = if gap > LATEST_RESPONSE_RANGE {
+        match app_state.tennet_api.get_balance_delta_high_res(
+            DateTime::from_timestamp(start, 0).unwrap(),
+            DateTime::from_timestamp(end, 0).unwrap(),
+        ).await {
+            Ok(r) => r,
+            Err(err) => {
+                tracing::error!("{:?}", err);
+                return records;
+            }
+        }
+    } else {
+        match app_state.tennet_api.get_balance_delta_high_res_latest().await {
+            Ok(r) => r,
+            Err(err) => {
+                tracing::error!("{:?}", err);
+                return records;
+            }
         }
     };
 
@@ -262,32 +252,41 @@ pub async fn sync_balance_delta (app_state: &AppState) -> Vec<BalanceDeltaRecord
                 array
                     .iter()
                     .flat_map(|v| v.points.clone())
-                    .collect::<Vec<BalanceDeltaPoint>>()
+                    .collect::<Vec<BalanceDeltaPointHighRes>>()
             }
         };
 
         for point in points {
 
-            let time =  match parse_tennet_time_stamp(&point.time_interval_start) {
-                LocalResult::Single(t) => Some(t.to_utc()),
-                LocalResult::Ambiguous(first, last) => {
+            let time = if point.time_interval_start.ends_with("Z") {
+                Some(DateTime::<Utc>::from_str(&point.time_interval_start).unwrap().timestamp())
+            } else {
+                match parse_tennet_time_stamp(&point.time_interval_start) {
+                    LocalResult::Single(t) => Some(t.to_utc().timestamp()),
+                    LocalResult::Ambiguous(first, last) => {
 
-                    let mut time_stamp = first.to_utc();
+                        let mut time_stamp = first.to_utc();
 
-                    let existing_record = balance_delta::get(&app_state.db_client, time_stamp.timestamp()).await;
+                        let existing_record = balance_delta_high_res::get(&app_state.db_client, time_stamp.timestamp()).await;
 
-                    if existing_record.is_some() {
-                        time_stamp = last.to_utc();
-                    }
+                        if existing_record.is_some() {
+                            time_stamp = last.to_utc();
+                        }
 
-                    Some(time_stamp)
-                },
-                LocalResult::None => None
+                        Some(time_stamp.timestamp())
+                    },
+                    LocalResult::None => None
+                }
             };
-
+            
             if let Some(time_stamp) = time {
-                records.push(BalanceDeltaRecord { 
-                    time_stamp: time_stamp.timestamp(), 
+
+                if time_stamp < start {
+                    continue;
+                }
+    
+                records.push(BalanceDeltaHighResRecord { 
+                    time_stamp, 
                     power_afrr_in: default_string_to_zero(point.power_afrr_in), 
                     power_afrr_out: default_string_to_zero(point.power_afrr_out), 
                     power_igcc_in: default_string_to_zero(point.power_igcc_in), 
@@ -296,18 +295,20 @@ pub async fn sync_balance_delta (app_state: &AppState) -> Vec<BalanceDeltaRecord
                     power_mfrrda_out: default_string_to_zero(point.power_mfrrda_out), 
                     power_picasso_in: default_some_string_to_zero(point.power_picasso_in), 
                     power_picasso_out: default_some_string_to_zero(point.power_picasso_out), 
+                    power_mari_in: default_some_string_to_zero(point.power_mari_in), 
+                    power_mari_out: default_some_string_to_zero(point.power_mari_out), 
                     max_upw_regulation_price: default_to_zero_option(point.max_upw_regulation_price),
                     min_downw_regulation_price: default_to_zero_option(point.min_downw_regulation_price),
                     mid_price: default_string_to_zero(point.mid_price),
                 });
-            };
+            }
         }
     }
 
     for records_chunk in records.chunks(PG_MAX_QUERY_PARAMS / RECORD_COLUMNS) {
-        match balance_delta::insert_many(&app_state.db_client, records_chunk).await {
+        match balance_delta_high_res::insert_many(&app_state.db_client, records_chunk).await {
             Ok(rows_affected) => {
-                tracing::info!("inserted {} records into balance delta db", rows_affected);
+                tracing::info!("inserted {} records into balance delta high res db", rows_affected);
             },
             Err(err) => {
                 tracing::error!("{:#?}", err);

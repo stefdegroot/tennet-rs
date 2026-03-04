@@ -1,4 +1,3 @@
-
 use sqlx::{Postgres, Pool};
 use tennet::TennetApi;
 use notification::Mqtt;
@@ -12,6 +11,7 @@ mod db;
 mod sync;
 mod notification;
 mod api;
+mod util;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -24,9 +24,6 @@ pub struct AppState {
 async fn main() {
 
     let subscriber = tracing_subscriber::FmtSubscriber::new();
-    // let subscriber = tracing_subscriber::FmtSubscriber::builder()
-    //     .with_max_level(tracing::Level::DEBUG)
-    //     .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap(); 
 
     let tennet_api = tennet::TennetApi::init();
@@ -44,6 +41,7 @@ async fn main() {
         mqtt_client: Arc::new(mqtt_client),
     };
 
+    tennet::balance_delta_high_res::import_balance_delta_high_res(app_state.clone()).await;
     tennet::merit_order::import_merit_order(app_state.clone()).await;
     tennet::balance_delta::import_balance_delta(app_state.clone()).await;
     tennet::settlement_prices::import_settlement_prices(app_state.clone()).await;

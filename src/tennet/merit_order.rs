@@ -12,18 +12,21 @@ use crate::{
         PG_MAX_QUERY_PARAMS,
         RECORD_COLUMNS,
     },
-    tennet::time::parse_tennet_time_stamp,
+    tennet::{
+        time::parse_tennet_time_stamp,
+        TennetAPIPeriod
+    },
     AppState
 };
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct MeritOrderPointThreshold {
     capacity_threshold: String,
     price_up: Option<String>,
     price_down: Option<String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct MeritOrderPoint {
     #[serde(rename="timeInterval_start")]
     pub time_interval_start: String,
@@ -139,7 +142,17 @@ pub async fn sync_merit_order (app_state: &AppState) -> Vec<merit_order::MeritOr
 
     for time_series in result.response.time_series {
 
-        for point in time_series.period.points {
+        let points = match time_series.period {
+            TennetAPIPeriod::Object(obj) => obj.points,
+            TennetAPIPeriod::Array(array) => {
+                array
+                    .iter()
+                    .flat_map(|v| v.points.clone())
+                    .collect::<Vec<MeritOrderPoint>>()
+            }
+        };
+
+        for point in points {
 
              let time =  match parse_tennet_time_stamp(&point.time_interval_start) {
                 LocalResult::Single(t) => Some(t.to_utc()),

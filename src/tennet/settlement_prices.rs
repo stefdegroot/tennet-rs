@@ -7,16 +7,23 @@ use lazy_static::lazy_static;
 use crate::{
     config::CONFIG,
     AppState,
-    tennet::time::parse_tennet_time_stamp,
+    tennet::{
+        time::parse_tennet_time_stamp,
+        TennetAPIPeriod
+    },
     db::{
         settlement_prices,
         settlement_prices::SettlementPriceRecord,
         PG_MAX_QUERY_PARAMS,
         RECORD_COLUMNS,
-    }
+    },
+    util::parse::{
+        default_to_zero_option,
+        default_string_to_zero,
+    },
 };
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct SettlementPricePoint {
     #[serde(rename="timeInterval_start")]
     pub time_interval_start: String,
@@ -242,7 +249,17 @@ pub async fn sync_settlement_prices (app_state: &AppState) -> Vec<SettlementPric
 
     for time_series in result.response.time_series {
 
-        for point in time_series.period.points {
+        let points = match time_series.period {
+            TennetAPIPeriod::Object(obj) => obj.points,
+            TennetAPIPeriod::Array(array) => {
+                array
+                    .iter()
+                    .flat_map(|v| v.points.clone())
+                    .collect::<Vec<SettlementPricePoint>>()
+            }
+        };
+
+        for point in points {
 
             let time =  match parse_tennet_time_stamp(&point.time_interval_start) {
                 LocalResult::Single(t) => Some(t.to_utc()),
@@ -301,16 +318,4 @@ pub async fn sync_settlement_prices (app_state: &AppState) -> Vec<SettlementPric
 
 fn convert_string_bool (bool: String) -> bool {
     bool == "YES"
-}
-
-fn default_to_zero_option (option: Option<String>) -> Option<f32> {
-    if let Some(string) = option {
-        string.parse().ok()
-    } else {
-        None
-    }
-}
-
-fn default_string_to_zero (string: String) -> f32 {
-    string.parse().unwrap_or(0.0)
 }

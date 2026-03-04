@@ -1,6 +1,7 @@
 use reqwest::{Client, header, Url};
 use serde::{Deserialize, de::DeserializeOwned};
 use anyhow::{Result, anyhow};
+use balance_delta_high_res::BalanceDeltaPointHighRes;
 use balance_delta::BalanceDeltaPoint;
 use settlement_prices::SettlementPricePoint;
 use chrono::{DateTime, Utc};
@@ -8,6 +9,7 @@ use chrono::{DateTime, Utc};
 use crate::config::CONFIG;
 
 pub mod balance_delta;
+pub mod balance_delta_high_res;
 pub mod merit_order;
 pub mod settlement_prices;
 pub mod time;
@@ -18,12 +20,19 @@ pub struct TennetApi {
     client: Client,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct TimeSeriesPeriod <T> {
     // #[serde(rename="timeInterval")]
     // time_interval: PeriodTimeInterval,
-    #[serde(rename="Points")]
+    #[serde(rename="Points", alias = "points")]
     pub points: Vec<T>
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(untagged)]
+pub enum TennetAPIPeriod <T> {
+    Object(TimeSeriesPeriod<T>),
+    Array(Vec<TimeSeriesPeriod<T>>),
 }
 
 #[derive(Deserialize, Debug)]
@@ -37,7 +46,7 @@ pub struct TimeSeries <T> {
     // #[serde(rename="currency_Unit_name")]
     // currency_unit_name: String,
     #[serde(rename="Period")]
-    pub period: TimeSeriesPeriod<T>,
+    pub period: TennetAPIPeriod<T>,
 }
 
 // #[derive(Deserialize, Debug)]
@@ -129,6 +138,29 @@ impl TennetApi {
                 Err(anyhow!(error.error))
             }
         }
+    }
+
+    pub async fn get_balance_delta_high_res_latest (&self) -> Result<TennetResponse<BalanceDeltaPointHighRes>> {
+
+        let response = self.request::<BalanceDeltaPointHighRes>(
+            "/v1/balance-delta-high-res/latest",
+            &[]
+        ).await?;
+
+        Ok(response)
+    }
+
+    pub async fn get_balance_delta_high_res (&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Result<TennetResponse<BalanceDeltaPointHighRes>> {
+
+        let response = self.request::<BalanceDeltaPointHighRes>(
+            "/v1/balance-delta-high-res",
+            &[
+                ("date_from", &time::create_tennet_time_stamp(from)),
+                ("date_to", &time::create_tennet_time_stamp(to)),
+            ]
+        ).await?;
+
+        Ok(response)
     }
 
     pub async fn get_balance_delta (&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Result<TennetResponse<BalanceDeltaPoint>> {

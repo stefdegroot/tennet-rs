@@ -5,9 +5,29 @@ use std::process::exit;
 use lazy_static::lazy_static;
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct Mosquitto {
-    pub username: String,
-    pub password: String,
+#[serde(default)]
+pub struct MqttOptions {
+    pub enabled: bool,
+    pub client_id: String,
+    pub host: String,
+    pub port: u16,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub root_topic: String,
+}
+
+impl Default for MqttOptions {
+    fn default() -> Self {
+        MqttOptions {
+            enabled: false,
+            client_id: "tennet-rs-server".to_string(),
+            host: "localhost".to_string(),
+            port: 1883,
+            username: None,
+            password: None,
+            root_topic: "/tennet".to_string(),
+        }
+    }
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -33,7 +53,7 @@ pub struct Data {
 pub struct Config {
     pub tennet: Tennet,
     pub db: DB,
-    pub mosquitto: Mosquitto,
+    pub mqtt: MqttOptions,
     pub data: Data,
 }
 

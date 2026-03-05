@@ -84,15 +84,13 @@ fn records_to_list (records: Vec<MeritOrderRecord>) -> Vec<MeritOrderList> {
 
     for r in records {
         
-        if let Some(last_time) = last_time_stamp {
-            if last_time != r.time_stamp {
-                lists.push(merit_order_list);
-                merit_order_list = MeritOrderList {
-                    time_stamp: r.time_stamp,
-                    upward: vec![],
-                    downward: vec![],
-                };
-            }
+        if let Some(last_time) = last_time_stamp && last_time != r.time_stamp {
+            lists.push(merit_order_list);
+            merit_order_list = MeritOrderList {
+                time_stamp: r.time_stamp,
+                upward: vec![],
+                downward: vec![],
+            };
         }
 
         if let Some (price_down) = r.price_down  {

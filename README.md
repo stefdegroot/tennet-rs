@@ -19,10 +19,69 @@ Imbalance market data service on top of the [Tennet Publication API](https://dev
 - [ ] Volume of Settled Activated Restoration and Emergency Reserve (aFRR)
 - [ ] Reconcilation Prices
 
+---
+
+### Config
+
+The service requires a `config.toml` file in the root folder with the following properties.
+
+#### Tennet
+
+```toml
+[tennet]
+api_url = "https://api.tennet.eu/publications"
+api_key = ""
+```
+
+#### Database
+
+```toml
+[db]
+user        = "admin"
+password    = ""
+name        = "test_db"
+host        = "localhost"
+```
+
+#### Mqtt
+
+By default publishing updates for data sources on mqtt is disabled. You can turn this on with the following configuration:
+
+```toml
+[mqtt]
+enabled     = true
+client_id   = "tennet-rs-server"
+host        = "localhost"
+port        = 1883
+username    = ""
+password    = ""
+root_topic  = "/tennet"
+```
+
+All properties are backed up by a default, as shown in the example above. And can be changed set individually, expect for `username` and `password` which are mutually exclusive to turn on/off authentication when connecting to the broker.
+
+#### Data
+
+```toml
+[data]
+path        = "./data"
+```
+
+---
+
+### Using the notification service
+
+When turned on in the configuration the service will publish the latest updates for all sources on separate topics. The topics start with the `root_topic` from the configuration, which defaults to `/tennet` if not specified. This is followed by the source path:
+- Balance Delta             => `/balance-delta`
+- Balance Delta High Res    => `/balance-delta-high-res`
+- Merit Order List          => `/merit-order`
+- Settlement Prices         => `/settlement-prices`
+
+---
+
 ### Syncing historical data
 
 
-### Using the notification service
 
 
 ### Local development

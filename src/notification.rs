@@ -12,13 +12,19 @@ impl Mqtt {
     pub fn init () -> Self {
 
         let mut mqtt_options = MqttOptions::new(
-            "tennet-rs-server",
-            "localhost",
-            1883,
+            &CONFIG.mqtt.client_id,
+            &CONFIG.mqtt.host,
+            CONFIG.mqtt.port,
         );
     
         mqtt_options.set_keep_alive(Duration::from_secs(5));
-        mqtt_options.set_credentials(&CONFIG.mosquitto.username, &CONFIG.mosquitto.password);
+
+        if 
+            let Some(username) = &CONFIG.mqtt.username &&
+            let Some(password) = &CONFIG.mqtt.password 
+        {
+            mqtt_options.set_credentials(username, password);
+        }
     
         let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
 
@@ -26,11 +32,9 @@ impl Mqtt {
             loop {
                 let event = eventloop.poll().await;
                 match &event {
-                    Ok(_v) => {
-                        // println!("Event = {v:?}");
-                    }
-                    Err(_e) => {
-                        // println!("Error = {e:?}");
+                    Ok(_v) => {}
+                    Err(err) => {
+                        tracing::error!("mqtt: {}", err);
                     }
                 }
             }
@@ -43,7 +47,7 @@ impl Mqtt {
 
     pub async fn publish (&self, topic: &str, payload: String) {
 
-        self.client.publish(topic, QoS::ExactlyOnce, false, payload)
+        self.client.publish(CONFIG.mqtt.root_topic.to_string() + topic, QoS::ExactlyOnce, false, payload)
             .await
             .unwrap();
 

@@ -27,7 +27,7 @@ fn sync_balance_delta_high_res (app_state: AppState) {
         let result = tennet::balance_delta_high_res::sync_balance_delta_high_res(&app_state).await;
 
         if !result.is_empty() {
-            app_state.mqtt_client.publish("tennet/balance-delta-high-res", serde_json::ser::to_string(&result).unwrap()).await;
+            app_state.mqtt_client.publish("balance-delta-high-res", serde_json::ser::to_string(&result).unwrap()).await;
         }
     });
 }
@@ -41,7 +41,7 @@ fn balance_delta_service (app_state: AppState) {
         let result = tennet::balance_delta::sync_balance_delta(&app_state).await;
 
         if !result.is_empty() {
-            app_state.mqtt_client.publish("tennet/balance-delta", serde_json::ser::to_string(&result).unwrap()).await;
+            app_state.mqtt_client.publish("balance-delta", serde_json::ser::to_string(&result).unwrap()).await;
         }
     });
 }
@@ -55,7 +55,7 @@ fn merit_order_service (app_state: AppState) {
         let result = tennet::merit_order::sync_merit_order(&app_state).await;
 
         if !result.is_empty() {
-            app_state.mqtt_client.publish("tennet/merit-order", serde_json::ser::to_string(&result).unwrap()).await;
+            app_state.mqtt_client.publish("merit-order", serde_json::ser::to_string(&result).unwrap()).await;
         }
     });
 }
@@ -69,7 +69,7 @@ fn settlement_prices_service (app_state: AppState) {
         let result = tennet::settlement_prices::sync_settlement_prices(&app_state).await;
 
         if !result.is_empty() {
-            app_state.mqtt_client.publish("tennet/settlement-prices", serde_json::ser::to_string(&result).unwrap()).await;
+            app_state.mqtt_client.publish("settlement-prices", serde_json::ser::to_string(&result).unwrap()).await;
         }
     });
 }

@@ -15,8 +15,8 @@ pub mod settlement_prices;
 pub mod time;
 
 pub struct TennetApi {
-    api_key: String,
-    base_url: String,
+    api_key: Option<String>,
+    base_url: Option<String>,
     client: Client,
 }
 
@@ -112,31 +112,35 @@ impl TennetApi {
 
     async fn request <R: DeserializeOwned> (&self, route: &str, params: &[(&str, &str)]) -> Result<TennetResponse<R>> {
 
-        let url = Url::parse_with_params(
-            &format!("{}{}", self.base_url, route),
-            params
-        )?;
+        if let Some(base_url) = &self.base_url && let Some(api_key) = &self.api_key {
+            let url = Url::parse_with_params(
+                &format!("{}{}", base_url, route),
+                params
+            )?;
 
-        let response = self.client
-            .get(url)
-            .header("apikey", &self.api_key)
-            .header(header::ACCEPT, "application/json")
-            .send()
-            .await?;
+            let response = self.client
+                .get(url)
+                .header("apikey", api_key)
+                .header(header::ACCEPT, "application/json")
+                .send()
+                .await?;
 
-        let decoded_response = response.json::<TennetAPIResponse<R>>()
-            .await?;
+            let decoded_response = response.json::<TennetAPIResponse<R>>()
+                .await?;
 
-        match decoded_response {
-            TennetAPIResponse::Data(tennet_response) => Ok(tennet_response),
-            TennetAPIResponse::Err(tennet_error) => {
-                tracing::error!(tennet_error.error_message);
-                Err(anyhow!(tennet_error.error_message))
-            },
-            TennetAPIResponse::BasicError(error) => {
-                tracing::error!(error.error);
-                Err(anyhow!(error.error))
+            match decoded_response {
+                TennetAPIResponse::Data(tennet_response) => Ok(tennet_response),
+                TennetAPIResponse::Err(tennet_error) => {
+                    tracing::error!(tennet_error.error_message);
+                    Err(anyhow!(tennet_error.error_message))
+                },
+                TennetAPIResponse::BasicError(error) => {
+                    tracing::error!(error.error);
+                    Err(anyhow!(error.error))
+                }
             }
+        } else {
+            Err(anyhow!("TenneT API Key not configured, can not send request."))
         }
     }
 

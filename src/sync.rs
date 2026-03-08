@@ -6,10 +6,16 @@ use tokio::{
 };
 use crate::{
     AppState,
-    tennet
+    tennet,
+    config::CONFIG,
 };
 
 pub fn sync_service (app_state: AppState) {
+
+    if !CONFIG.tennet.is_configured() {
+        tracing::warn!("TenneT API details not configured, syncing for this data source not setup.");
+        return;
+    }
 
     let _ = schedule_tasks(ScheduleGranularity::Seconds, &[ 1, 13, 25, 37, 49 ],app_state.clone(), sync_balance_delta_high_res, "balance_delta_high_res");
     let _ = schedule_tasks(ScheduleGranularity::Seconds, &[5],app_state.clone(), balance_delta_service, "balance_delta");

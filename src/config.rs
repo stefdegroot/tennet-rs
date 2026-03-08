@@ -31,9 +31,15 @@ impl Default for MqttOptions {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct Tennet {
-    pub api_url: String,
-    pub api_key: String,
+pub struct TennetOptions {
+    pub api_url: Option<String>,
+    pub api_key: Option<String>,
+}
+
+impl TennetOptions {
+    pub fn is_configured (&self) -> bool {
+        self.api_key.is_some() && self.api_url.is_some()
+    }
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -51,7 +57,7 @@ pub struct Data {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config {
-    pub tennet: Tennet,
+    pub tennet: TennetOptions,
     pub db: DB,
     pub mqtt: MqttOptions,
     pub data: Data,

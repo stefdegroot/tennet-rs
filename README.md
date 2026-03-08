@@ -27,6 +27,8 @@ The service requires a `config.toml` file in the root folder with the following 
 
 #### Tennet
 
+The syncing service requires an API key from the TenneT API Developer Portal, you can register an account [here](https://developer.tennet.eu/register/). Without this key the service can still operate, but only provides historical data loaded in from the `/data` folder.
+
 ```toml
 [tennet]
 api_url = "https://api.tennet.eu/publications"

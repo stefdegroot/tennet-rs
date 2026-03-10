@@ -1,20 +1,22 @@
 use serde::Deserialize;
-use std::{io, path::PathBuf};
+use std::path::PathBuf;
 use std::collections::HashSet;
 use chrono::{offset::LocalResult, TimeZone, DateTime, Utc};
 use chrono_tz::Europe::Amsterdam;
 use lazy_static::lazy_static;
 
-use crate::config::CONFIG;
 use crate::AppState;
 use crate::tennet::{
     time::parse_tennet_time_stamp,
     TennetAPIPeriod
 };
-use crate::util::parse::{
-    default_to_zero_option,
-    default_string_to_zero,
-    default_some_string_to_zero,
+use crate::util::{
+    parse::{
+        default_to_zero_option,
+        default_string_to_zero,
+        default_some_string_to_zero,
+    },
+    files::get_files_from_data_folder,
 };
 use crate::db::{
     balance_delta,
@@ -97,11 +99,15 @@ pub async fn import_balance_delta (app_state: AppState) {
         )
     }
 
-    let files = get_files().unwrap();
+    let files = match get_files_from_data_folder("balance_delta") {
+        Ok(f) => f,
+        Err(err) => {
+            tracing::error!("Failed to read high res balance delta data folder {:?}", err);
+            return;
+        }
+    };
 
-    for (path, name) in files {
-        
-        let (_, end_time) = get_time_from_file_name(&name);
+    for (path, name, _, end_time) in files {
 
         if sync_from > end_time {
             continue;
@@ -115,39 +121,6 @@ pub async fn import_balance_delta (app_state: AppState) {
 
 fn default_to_zero (option: Option<f32>) -> f32 {
     option.unwrap_or(0.0)
-}
-
-fn get_files () -> io::Result<Vec<(PathBuf, String)>>  {
-
-    let dir_path = format!("{}/balance_delta", CONFIG.data.path);
-    let files = std::fs::read_dir(dir_path)?
-        .map(|res| res.map(|e| (e.path(), e.file_name().into_string().unwrap())))
-        .collect::<Result<Vec<_>, io::Error>>()?;
-
-    Ok(files)
-}
-
-fn get_time_from_file_name (filename: &str) -> (i64, i64) {
-
-    let split: Vec<&str> = filename.split("BALANCE_DELTA_MONTH_").collect();
-
-    let year: i32 = split[1].get(0..4).unwrap().parse().unwrap();
-    let month: u32 = split[1].get(5..7).unwrap().parse().unwrap();
-
-    let start_time = Amsterdam.with_ymd_and_hms(year, month, 1, 0, 0, 0);
-    let end_time = Amsterdam.with_ymd_and_hms(
-        if month < 12 { year } else { year + 1 }, 
-        if month < 12 { month + 1 } else { 1 }, 
-        1,
-        0,
-        0,
-        0
-    );
-
-    (
-        start_time.earliest().unwrap().timestamp(),
-        end_time.earliest().unwrap().timestamp(),
-    )
 }
 
 async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
@@ -191,17 +164,17 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
                 continue;
             }
 
-            records.push(BalanceDeltaRecord { 
-                time_stamp, 
-                power_afrr_in: default_to_zero(row.power_afrr_in), 
-                power_afrr_out: default_to_zero(row.power_afrr_out), 
-                power_igcc_in: default_to_zero(row.power_igcc_in), 
-                power_igcc_out: default_to_zero(row.power_igcc_out), 
-                power_mfrrda_in: default_to_zero(row.power_mfrrda_in), 
-                power_mfrrda_out: default_to_zero(row.power_mfrrda_out), 
-                power_picasso_in: default_to_zero(row.power_picasso_in), 
-                power_picasso_out: default_to_zero(row.power_picasso_out), 
-                max_upw_regulation_price: row.max_upw_regulation_price, 
+            records.push(BalanceDeltaRecord {
+                time_stamp,
+                power_afrr_in: default_to_zero(row.power_afrr_in),
+                power_afrr_out: default_to_zero(row.power_afrr_out),
+                power_igcc_in: default_to_zero(row.power_igcc_in),
+                power_igcc_out: default_to_zero(row.power_igcc_out),
+                power_mfrrda_in: default_to_zero(row.power_mfrrda_in),
+                power_mfrrda_out: default_to_zero(row.power_mfrrda_out),
+                power_picasso_in: default_to_zero(row.power_picasso_in),
+                power_picasso_out: default_to_zero(row.power_picasso_out),
+                max_upw_regulation_price: row.max_upw_regulation_price,
                 min_downw_regulation_price: row.min_downw_regulation_price,
                 mid_price: default_to_zero(row.mid_price),
             });
@@ -286,16 +259,16 @@ pub async fn sync_balance_delta (app_state: &AppState) -> Vec<BalanceDeltaRecord
             };
 
             if let Some(time_stamp) = time {
-                records.push(BalanceDeltaRecord { 
-                    time_stamp: time_stamp.timestamp(), 
-                    power_afrr_in: default_string_to_zero(point.power_afrr_in), 
-                    power_afrr_out: default_string_to_zero(point.power_afrr_out), 
-                    power_igcc_in: default_string_to_zero(point.power_igcc_in), 
-                    power_igcc_out: default_string_to_zero(point.power_igcc_out), 
-                    power_mfrrda_in: default_string_to_zero(point.power_mfrrda_in), 
-                    power_mfrrda_out: default_string_to_zero(point.power_mfrrda_out), 
-                    power_picasso_in: default_some_string_to_zero(point.power_picasso_in), 
-                    power_picasso_out: default_some_string_to_zero(point.power_picasso_out), 
+                records.push(BalanceDeltaRecord {
+                    time_stamp: time_stamp.timestamp(),
+                    power_afrr_in: default_string_to_zero(point.power_afrr_in),
+                    power_afrr_out: default_string_to_zero(point.power_afrr_out),
+                    power_igcc_in: default_string_to_zero(point.power_igcc_in),
+                    power_igcc_out: default_string_to_zero(point.power_igcc_out),
+                    power_mfrrda_in: default_string_to_zero(point.power_mfrrda_in),
+                    power_mfrrda_out: default_string_to_zero(point.power_mfrrda_out),
+                    power_picasso_in: default_some_string_to_zero(point.power_picasso_in),
+                    power_picasso_out: default_some_string_to_zero(point.power_picasso_out),
                     max_upw_regulation_price: default_to_zero_option(point.max_upw_regulation_price),
                     min_downw_regulation_price: default_to_zero_option(point.min_downw_regulation_price),
                     mid_price: default_string_to_zero(point.mid_price),

@@ -1,12 +1,11 @@
 use serde::Deserialize;
-use std::{io, path::PathBuf};
+use std::path::PathBuf;
 use chrono::{offset::LocalResult, TimeZone, DateTime, Utc};
 use chrono_tz::Europe::Amsterdam;
 use std::collections::{HashMap, HashSet};
 use lazy_static::lazy_static;
 
 use crate::{
-    config::CONFIG,
     db::{
         merit_order::{self, MeritOrderList, MeritOrderRecord},
         PG_MAX_QUERY_PARAMS,
@@ -15,6 +14,9 @@ use crate::{
     tennet::{
         time::parse_tennet_time_stamp,
         TennetAPIPeriod
+    },
+    util::{
+        files::get_files_from_data_folder,
     },
     AppState
 };
@@ -80,11 +82,15 @@ pub async fn import_merit_order (app_state: AppState) {
         )
     }
 
-    let files = get_files().unwrap();
-    
-    for (path, name) in files {
-        
-        let (_, end_time) = get_time_from_file_name(&name);
+    let files = match get_files_from_data_folder("merit_order") {
+        Ok(f) => f,
+        Err(err) => {
+            tracing::error!("Failed to read high res balance delta data folder {:?}", err);
+            return;
+        }
+    };
+
+    for (path, name, _, end_time) in files {
 
         if sync_from > end_time {
             continue;
@@ -133,7 +139,7 @@ pub async fn sync_merit_order (app_state: &AppState) -> Vec<merit_order::MeritOr
         Err(err) => {
             println!("{:?}", err);
             return lists;
-        } 
+        }
     };
 
     merit_order::delete_range(&app_state.db_client, start, end).await;
@@ -189,7 +195,7 @@ pub async fn sync_merit_order (app_state: &AppState) -> Vec<merit_order::MeritOr
                 };
 
                 for list_item in point.thresholds {
-                    
+
                     if let Some(price_up) = list_item.price_up {
                         list.upward.push((list_item.capacity_threshold.parse::<f32>().unwrap(), price_up.parse::<f32>().unwrap()));
                     }
@@ -198,7 +204,7 @@ pub async fn sync_merit_order (app_state: &AppState) -> Vec<merit_order::MeritOr
                         list.downward.push((list_item.capacity_threshold.parse::<f32>().unwrap(), price_down.parse::<f32>().unwrap()));
                     }
                 }
-    
+
                 lists.push(list);
             }
         }
@@ -207,39 +213,6 @@ pub async fn sync_merit_order (app_state: &AppState) -> Vec<merit_order::MeritOr
     insert_merit_order(app_state, &lists).await;
 
     lists
-}
-
-fn get_files () -> io::Result<Vec<(PathBuf, String)>>  {
-
-    let dir_path = format!("{}/merit_order", CONFIG.data.path);
-    let files = std::fs::read_dir(dir_path)?
-        .map(|res| res.map(|e| (e.path(), e.file_name().into_string().unwrap())))
-        .collect::<Result<Vec<_>, io::Error>>()?;
-
-    Ok(files)
-}
-
-fn get_time_from_file_name (filename: &str) -> (i64, i64) {
-
-    let split: Vec<&str> = filename.split("MERIT_ORDER_LIST_MONTH_").collect();
-
-    let year: i32 = split[1].get(0..4).unwrap().parse().unwrap();
-    let month: u32 = split[1].get(5..7).unwrap().parse().unwrap();
-
-    let start_time = Amsterdam.with_ymd_and_hms(year, month, 1, 0, 0, 0);
-    let end_time = Amsterdam.with_ymd_and_hms(
-        if month < 12 { year } else { year + 1 }, 
-        if month < 12 { month + 1 } else { 1 }, 
-        1,
-        0,
-        0,
-        0
-    );
-
-    (
-        start_time.earliest().unwrap().timestamp(),
-        end_time.earliest().unwrap().timestamp(),
-    )
 }
 
 async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
@@ -338,7 +311,7 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
                     if let Some(up) = row.price_up {
                         current_list.upward.push((row.capacity_threshold, up))
                     }
-    
+
                     if let Some(down) = row.price_down {
                         current_list.downward.push((row.capacity_threshold, down))
                     }

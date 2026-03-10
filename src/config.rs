@@ -52,7 +52,7 @@ pub struct DB {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Data {
-    pub path: String,
+    pub path: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]

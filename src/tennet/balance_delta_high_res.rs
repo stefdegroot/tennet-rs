@@ -13,10 +13,13 @@ use crate::tennet::{
     },
     TennetAPIPeriod,
 };
-use crate::util::parse::{
-    default_to_zero_option,
-    default_string_to_zero,
-    default_some_string_to_zero,
+use crate::util::{
+    parse::{
+        default_to_zero_option,
+        default_string_to_zero,
+        default_some_string_to_zero,
+    },
+    files::get_files_from_data_folder,
 };
 use crate::db::{
     balance_delta_high_res,
@@ -24,7 +27,6 @@ use crate::db::{
     PG_MAX_QUERY_PARAMS,
     RECORD_COLUMNS,
 };
-use crate::util::files::get_files_from_data_folder;
 
 const LATEST_RESPONSE_RANGE: i64 = 1740;
 
@@ -134,7 +136,7 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
 
     let mut rdr = csv::ReaderBuilder::new()
         .has_headers(true)
-        .delimiter(b',')
+        .delimiter(b';')
         .trim(csv::Trim::Headers)
         .from_path(path).unwrap();
 
@@ -169,19 +171,19 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
                 continue;
             }
 
-            records.push(BalanceDeltaHighResRecord { 
-                time_stamp, 
-                power_afrr_in: row.power_afrr_in.unwrap_or(0.0), 
-                power_afrr_out: row.power_afrr_out.unwrap_or(0.0), 
-                power_igcc_in: row.power_igcc_in.unwrap_or(0.0), 
-                power_igcc_out: row.power_igcc_out.unwrap_or(0.0), 
-                power_mfrrda_in: row.power_mfrrda_in.unwrap_or(0.0), 
-                power_mfrrda_out: row.power_mfrrda_out.unwrap_or(0.0), 
-                power_picasso_in: row.power_picasso_in.unwrap_or(0.0), 
+            records.push(BalanceDeltaHighResRecord {
+                time_stamp,
+                power_afrr_in: row.power_afrr_in.unwrap_or(0.0),
+                power_afrr_out: row.power_afrr_out.unwrap_or(0.0),
+                power_igcc_in: row.power_igcc_in.unwrap_or(0.0),
+                power_igcc_out: row.power_igcc_out.unwrap_or(0.0),
+                power_mfrrda_in: row.power_mfrrda_in.unwrap_or(0.0),
+                power_mfrrda_out: row.power_mfrrda_out.unwrap_or(0.0),
+                power_picasso_in: row.power_picasso_in.unwrap_or(0.0),
                 power_picasso_out: row.power_picasso_out.unwrap_or(0.0),
-                power_mari_in: row.power_mari_in.unwrap_or(0.0), 
-                power_mari_out: row.power_mari_out.unwrap_or(0.0), 
-                max_upw_regulation_price: row.max_upw_regulation_price, 
+                power_mari_in: row.power_mari_in.unwrap_or(0.0),
+                power_mari_out: row.power_mari_out.unwrap_or(0.0),
+                max_upw_regulation_price: row.max_upw_regulation_price,
                 min_downw_regulation_price: row.min_downw_regulation_price,
                 mid_price: row.mid_price.unwrap_or(0.0),
             });
@@ -278,25 +280,25 @@ pub async fn sync_balance_delta_high_res (app_state: &AppState) -> Vec<BalanceDe
                     LocalResult::None => None
                 }
             };
-            
+
             if let Some(time_stamp) = time {
 
                 if time_stamp < start {
                     continue;
                 }
-    
-                records.push(BalanceDeltaHighResRecord { 
-                    time_stamp, 
-                    power_afrr_in: default_string_to_zero(point.power_afrr_in), 
-                    power_afrr_out: default_string_to_zero(point.power_afrr_out), 
-                    power_igcc_in: default_string_to_zero(point.power_igcc_in), 
-                    power_igcc_out: default_string_to_zero(point.power_igcc_out), 
-                    power_mfrrda_in: default_string_to_zero(point.power_mfrrda_in), 
-                    power_mfrrda_out: default_string_to_zero(point.power_mfrrda_out), 
-                    power_picasso_in: default_some_string_to_zero(point.power_picasso_in), 
-                    power_picasso_out: default_some_string_to_zero(point.power_picasso_out), 
-                    power_mari_in: default_some_string_to_zero(point.power_mari_in), 
-                    power_mari_out: default_some_string_to_zero(point.power_mari_out), 
+
+                records.push(BalanceDeltaHighResRecord {
+                    time_stamp,
+                    power_afrr_in: default_string_to_zero(point.power_afrr_in),
+                    power_afrr_out: default_string_to_zero(point.power_afrr_out),
+                    power_igcc_in: default_string_to_zero(point.power_igcc_in),
+                    power_igcc_out: default_string_to_zero(point.power_igcc_out),
+                    power_mfrrda_in: default_string_to_zero(point.power_mfrrda_in),
+                    power_mfrrda_out: default_string_to_zero(point.power_mfrrda_out),
+                    power_picasso_in: default_some_string_to_zero(point.power_picasso_in),
+                    power_picasso_out: default_some_string_to_zero(point.power_picasso_out),
+                    power_mari_in: default_some_string_to_zero(point.power_mari_in),
+                    power_mari_out: default_some_string_to_zero(point.power_mari_out),
                     max_upw_regulation_price: default_to_zero_option(point.max_upw_regulation_price),
                     min_downw_regulation_price: default_to_zero_option(point.min_downw_regulation_price),
                     mid_price: default_string_to_zero(point.mid_price),

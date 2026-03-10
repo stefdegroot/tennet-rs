@@ -64,6 +64,8 @@ All properties are backed up by a default, as shown in the example above. And ca
 
 #### Data
 
+If the data folder is configured, the service will [syncing historical data](#syncing-historical-data) from the provided files. If turned off, the service will start syncing based on the API, which due to rate limiting can take a while, and it is therefore not recommended.
+
 ```toml
 [data]
 path        = "./data"
@@ -83,27 +85,22 @@ When turned on in the configuration the service will publish the latest updates 
 
 ### Syncing historical data
 
+To sync historical data correctly the data folder should follow the format below:
 
-
-
-### Local development
-
-Setup local Postgres instance ([external docs](https://medium.com/@jewelski/quickly-set-up-a-local-postgres-database-using-docker-5098052a4726)) and MQTT broker.
-
-```shell
-docker-compose up -d
+```
+data
+└─── balance_delta_high_res
+│    │─ BALANCE_DELTA_HIGH_RES_2025-01.csv
+│    └─ BALANCE_DELTA_HIGH_RES_2025-02-01.csv
+└─── balance_delta
+│    │─ BALANCE_DELTA_2025-01.csv
+│    └─ BALANCE_DELTA_2025-02-01.csv
+└─── merit_order
+│    └─ MERIT_ORDER_2025-01.csv
+└─── settlement_prices
+     │─ SETTLEMENT_PRICES_2024.csv
+     └─ SETTLEMENT_PRICES_2025-01.csv
 ```
 
-### Building and deploying
+If you want to gather the historical data yourself you can download the individual CSV files from the [TenneT Website](https://www.tennet.eu/nl-en/markets/transparency/download-page-transparency). Alternatively, you can use the pre bundled dataset from Birch Systems, which can be downloaded [here](https://birch-systems.s3.nl-ams.scw.cloud/tennet/tennet_export.zip), to speed up your process. (In a future release, importing historical data will be fully automated)
 
-#### Clippy
-
-All pull-requests should pass the whole Clippy specification, no errors, warning or suggestions are allowed.
-
-The response from:
-
-```shell
-cargo clippy
-```
-
-should be clean.

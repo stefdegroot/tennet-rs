@@ -4,28 +4,34 @@ use tokio::task;
 use crate::config::CONFIG;
 
 pub struct Mqtt {
-    client: AsyncClient
+    client: Option<AsyncClient>
 }
 
 impl Mqtt {
 
     pub fn init () -> Self {
 
+        if !&CONFIG.mqtt.enabled {
+            return Mqtt {
+                client: None
+            };
+        }
+
         let mut mqtt_options = MqttOptions::new(
             &CONFIG.mqtt.client_id,
             &CONFIG.mqtt.host,
             CONFIG.mqtt.port,
         );
-    
+
         mqtt_options.set_keep_alive(Duration::from_secs(5));
 
-        if 
+        if
             let Some(username) = &CONFIG.mqtt.username &&
-            let Some(password) = &CONFIG.mqtt.password 
+            let Some(password) = &CONFIG.mqtt.password
         {
             mqtt_options.set_credentials(username, password);
         }
-    
+
         let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
 
         task::spawn(async move {
@@ -41,15 +47,19 @@ impl Mqtt {
         });
 
         Mqtt {
-            client,
+            client: Some(client),
         }
     }
 
     pub async fn publish (&self, topic: &str, payload: String) {
 
-        self.client.publish(CONFIG.mqtt.root_topic.to_string() + topic, QoS::ExactlyOnce, false, payload)
-            .await
-            .unwrap();
-
+        if let Some(client) = &self.client {
+            match client.publish(CONFIG.mqtt.root_topic.to_string() + topic, QoS::ExactlyOnce, false, payload).await {
+                Ok(_) => (),
+                Err(err) => {
+                    tracing::error!("Failed to publish mqtt message: {}", err)
+                }
+            }
+        }
     }
 }

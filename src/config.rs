@@ -31,9 +31,29 @@ impl Default for MqttOptions {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+#[serde(default)]
+pub struct TennetSourceOption {
+    pub enabled: bool,
+    pub sync_from: Option<String>,
+}
+
+impl Default for TennetSourceOption {
+    fn default() -> Self {
+        TennetSourceOption {
+            enabled: true,
+            sync_from: None,
+        }
+    }
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
 pub struct TennetOptions {
     pub api_url: Option<String>,
     pub api_key: Option<String>,
+    pub balance_delta: TennetSourceOption,
+    pub balance_delta_high_res: TennetSourceOption,
+    pub merit_order: TennetSourceOption,
+    pub settlement_prices: TennetSourceOption,
 }
 
 impl TennetOptions {
@@ -50,15 +70,16 @@ pub struct DB {
     pub host: String,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Default)]
 pub struct Data {
     pub path: Option<String>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Default)]
+#[serde(default)]
 pub struct Config {
     pub tennet: TennetOptions,
-    pub db: DB,
+    pub db: Option<DB>,
     pub mqtt: MqttOptions,
     pub data: Data,
 }
@@ -83,7 +104,8 @@ pub fn load_config () -> Config {
 
     let config: Config = match toml::from_str(&contents) {
         Ok(d) => d,
-        Err(_) => {
+        Err(err) => {
+            error!("{}", err);
             error!("Could not read config.toml file.");
             exit(1);
         }

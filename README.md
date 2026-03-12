@@ -35,6 +35,24 @@ api_url = "https://api.tennet.eu/publications"
 api_key = ""
 ```
 
+Syncing can be turned on or off by data source. By default the entire data sources is synchronized as far back in time as it is available in the TenneT API. But in the case that service is being used just to publish the latest changes on MQTT syncing can be configured to `latest` to start from the current time, or alternatively a specific ISO time string can be provided as a starting point.
+
+```toml
+[tennet.balance_delta_high_res]
+enabled = true
+sync_from = "latest"
+
+[tennet.settlement_prices]
+enabled = true
+sync_from = "2026-01-01T23:00:00+01:00"
+
+[tennet.merit_order]
+enabled = true
+
+[tennet.balance_delta]
+enabled = false
+```
+
 #### Database
 
 ```toml

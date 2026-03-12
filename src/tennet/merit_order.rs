@@ -4,6 +4,7 @@ use chrono::{offset::LocalResult, TimeZone, DateTime, Utc};
 use chrono_tz::Europe::Amsterdam;
 use std::collections::{HashMap, HashSet};
 use lazy_static::lazy_static;
+use crate::config::CONFIG;
 
 use crate::{
     db::{
@@ -64,10 +65,39 @@ lazy_static! {
     pub static ref FIRST_MERIT_ORDER_DATE: i64 = Amsterdam.with_ymd_and_hms(2018, 1, 1, 0, 0, 0).unwrap().timestamp();
 }
 
+fn get_start_sync_date () -> i64 {
+
+    let mut start_date = *FIRST_MERIT_ORDER_DATE;
+
+    if let Some(sync_from) = &CONFIG.tennet.merit_order.sync_from {
+
+        if sync_from == "latest" {
+            let current_time = Utc::now().timestamp();
+            start_date = current_time - current_time % 900 - 900;
+        } else {
+            match DateTime::parse_from_rfc3339(sync_from) {
+                Ok(date) => {
+                    start_date = i64::max(start_date, date.timestamp())
+                },
+                Err(_) => {
+                    tracing::error!("{} is not a valid RFC 3339 date time string", sync_from);
+                    std::process::exit(1);
+                }
+            }
+        }
+    }
+
+    start_date
+}
+
 pub async fn import_merit_order (app_state: AppState) {
 
+    if !CONFIG.tennet.merit_order.enabled {
+        return;
+    }
+
     let latest_record = merit_order::get_latest(&app_state.db_client).await;
-    let mut sync_from = 0;
+    let mut sync_from = get_start_sync_date();
 
     if let Some(latest) = latest_record {
         tracing::info!(
@@ -77,15 +107,15 @@ pub async fn import_merit_order (app_state: AppState) {
         sync_from = latest.time_stamp + 900;
     } else {
         tracing::info!(
-            "Merit order db empty, syncing from start of publication {:?}",
-            DateTime::from_timestamp(*FIRST_MERIT_ORDER_DATE, 0).unwrap()
+            "Merit order db empty, syncing from start of publication or configured date {:?}",
+            DateTime::from_timestamp(sync_from, 0).unwrap()
         )
     }
 
     let files = match get_files_from_data_folder("merit_order") {
         Ok(f) => f,
         Err(err) => {
-            tracing::error!("Failed to read high res balance delta data folder {:?}", err);
+            tracing::error!("Failed to read merit order data folder {:?}", err);
             return;
         }
     };
@@ -105,10 +135,10 @@ pub async fn import_merit_order (app_state: AppState) {
 pub async fn sync_merit_order (app_state: &AppState) -> Vec<merit_order::MeritOrderList> {
 
     let latest_record = merit_order::get_latest(&app_state.db_client).await;
-    let mut sync_from = *FIRST_MERIT_ORDER_DATE;
+    let mut sync_from = get_start_sync_date();
 
     if let Some(latest) = latest_record {
-        sync_from = latest.time_stamp;
+        sync_from = i64::max(latest.time_stamp, sync_from);
     }
 
     let current_time_stamp = Utc::now().timestamp();
@@ -122,7 +152,6 @@ pub async fn sync_merit_order (app_state: &AppState) -> Vec<merit_order::MeritOr
         start = sync_from + 900;
         end = sync_from + 86400 + 900;
     }
-
 
     println!("syncing merit order: {:?} - {:?}",
         DateTime::from_timestamp(start, 0).unwrap(),

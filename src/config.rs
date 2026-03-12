@@ -75,11 +75,11 @@ pub struct Data {
     pub path: Option<String>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Default)]
 #[serde(default)]
 pub struct Config {
     pub tennet: TennetOptions,
-    pub db: DB,
+    pub db: Option<DB>,
     pub mqtt: MqttOptions,
     pub data: Data,
 }

@@ -7,6 +7,7 @@ use chrono_tz::Europe::Amsterdam;
 use lazy_static::lazy_static;
 
 use crate::AppState;
+use crate::config::CONFIG;
 use crate::tennet::{
     time::{
         parse_tennet_time_stamp,
@@ -92,10 +93,40 @@ lazy_static! {
     pub static ref FIRST_HIGH_RES_BALANCE_DATE: i64 = Amsterdam.with_ymd_and_hms(2025, 11, 19, 0, 0, 0).unwrap().timestamp();
 }
 
+fn get_start_sync_date () -> i64 {
+
+    let mut start_date = *FIRST_HIGH_RES_BALANCE_DATE;
+
+    if let Some(sync_from) = &CONFIG.tennet.balance_delta_high_res.sync_from {
+
+        if sync_from == "latest" {
+            let current_time = Utc::now().timestamp();
+            let delay = 120;
+            start_date = current_time - current_time % 12 - 36 - delay;
+        } else {
+            match DateTime::parse_from_rfc3339(sync_from) {
+                Ok(date) => {
+                    start_date = i64::max(start_date, date.timestamp())
+                },
+                Err(_) => {
+                    tracing::error!("{} is not a valid RFC 3339 date time string", sync_from);
+                    std::process::exit(1);
+                }
+            }
+        }
+    }
+
+    start_date
+}
+
 pub async fn import_balance_delta_high_res (app_state: AppState) {
 
-    let latest_record = balance_delta_high_res::get_latest(&app_state.db_client).await;
-    let mut sync_from = 0;
+    if !CONFIG.tennet.balance_delta_high_res.enabled {
+        return;
+    }
+
+    let latest_record: Option<BalanceDeltaHighResRecord> = balance_delta_high_res::get_latest(&app_state.db_client).await;
+    let mut sync_from = get_start_sync_date();
 
     if let Some(latest) = latest_record {
         tracing::info!(
@@ -105,8 +136,8 @@ pub async fn import_balance_delta_high_res (app_state: AppState) {
         sync_from = latest.time_stamp + 12;
     } else {
         tracing::info!(
-            "High res balance delta db empty, syncing from start of publication {:?}",
-            DateTime::from_timestamp(*FIRST_HIGH_RES_BALANCE_DATE, 0).unwrap()
+            "High res balance delta db empty, syncing from start of publication or configured date {:?}",
+            DateTime::from_timestamp(sync_from, 0).unwrap()
         )
     }
 
@@ -205,10 +236,10 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
 pub async fn sync_balance_delta_high_res (app_state: &AppState) -> Vec<BalanceDeltaHighResRecord> {
 
     let latest_record = balance_delta_high_res::get_latest(&app_state.db_client).await;
-    let mut sync_from = *FIRST_HIGH_RES_BALANCE_DATE;
+    let mut sync_from = get_start_sync_date();
 
     if let Some(latest) = latest_record {
-        sync_from = latest.time_stamp;
+        sync_from = i64::max(latest.time_stamp, sync_from);
     }
 
     let current_time_stamp = Utc::now().timestamp();

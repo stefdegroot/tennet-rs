@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use chrono::{offset::LocalResult, TimeZone, DateTime, Utc};
 use chrono_tz::Europe::Amsterdam;
 use lazy_static::lazy_static;
+use crate::config::CONFIG;
 use crate::{
     AppState,
     tennet::{
@@ -72,10 +73,39 @@ lazy_static! {
     pub static ref FIRST_SETTLEMENT_DATE: i64 = Amsterdam.with_ymd_and_hms(2018, 1, 1, 0, 0, 0).unwrap().timestamp();
 }
 
+fn get_start_sync_date () -> i64 {
+
+    let mut start_date = *FIRST_SETTLEMENT_DATE;
+
+    if let Some(sync_from) = &CONFIG.tennet.settlement_prices.sync_from {
+
+        if sync_from == "latest" {
+            let current_time = Utc::now().timestamp();
+            start_date = current_time - current_time % 86400 - 86400;
+        } else {
+            match DateTime::parse_from_rfc3339(sync_from) {
+                Ok(date) => {
+                    start_date = i64::max(start_date, date.timestamp())
+                },
+                Err(_) => {
+                    tracing::error!("{} is not a valid RFC 3339 date time string", sync_from);
+                    std::process::exit(1);
+                }
+            }
+        }
+    }
+
+    start_date
+}
+
 pub async fn import_settlement_prices (app_state: AppState) {
 
+    if !CONFIG.tennet.settlement_prices.enabled {
+        return;
+    }
+
     let latest_record = settlement_prices::get_latest(&app_state.db_client).await;
-    let mut sync_from = 0;
+    let mut sync_from = get_start_sync_date();
 
     if let Some(latest) = latest_record {
          tracing::info!(
@@ -85,15 +115,15 @@ pub async fn import_settlement_prices (app_state: AppState) {
         sync_from = latest.time_stamp + 60;
     } else {
         tracing::info!(
-            "Settlement prices db empty, syncing from start of publication {:?}",
-            DateTime::from_timestamp(*FIRST_SETTLEMENT_DATE, 0).unwrap()
+            "Settlement prices db empty, syncing from start of publication or configured date {:?}",
+            DateTime::from_timestamp(sync_from, 0).unwrap()
         )
     }
 
     let files = match get_files_from_data_folder("settlement_prices") {
         Ok(f) => f,
         Err(err) => {
-            tracing::error!("Failed to read high res balance delta data folder {:?}", err);
+            tracing::error!("Failed to read settlement prices data folder {:?}", err);
             return;
         }
     };
@@ -180,10 +210,10 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
 pub async fn sync_settlement_prices (app_state: &AppState) -> Vec<SettlementPriceRecord> {
 
     let latest_record = settlement_prices::get_latest(&app_state.db_client).await;
-    let mut sync_from = *FIRST_SETTLEMENT_DATE;
+    let mut sync_from = get_start_sync_date();
 
     if let Some(latest) = latest_record {
-        sync_from = latest.time_stamp;
+        sync_from = i64::max(latest.time_stamp, sync_from);
     }
 
     let current_time_stamp = Utc::now().timestamp();

@@ -6,6 +6,7 @@ use chrono_tz::Europe::Amsterdam;
 use lazy_static::lazy_static;
 
 use crate::AppState;
+use crate::config::CONFIG;
 use crate::tennet::{
     time::parse_tennet_time_stamp,
     TennetAPIPeriod
@@ -81,10 +82,40 @@ lazy_static! {
     pub static ref FIRST_BALANCE_DATE: i64 = Amsterdam.with_ymd_and_hms(2018, 5, 1, 0, 0, 0).unwrap().timestamp();
 }
 
+fn get_start_sync_date () -> i64 {
+
+    let mut start_date = *FIRST_BALANCE_DATE;
+
+    if let Some(sync_from) = &CONFIG.tennet.balance_delta.sync_from {
+
+        if sync_from == "latest" {
+            let current_time = Utc::now().timestamp();
+            let delay = 120;
+            start_date = current_time - current_time % 60 - delay;
+        } else {
+            match DateTime::parse_from_rfc3339(sync_from) {
+                Ok(date) => {
+                    start_date = i64::max(start_date, date.timestamp())
+                },
+                Err(_) => {
+                    tracing::error!("{} is not a valid RFC 3339 date time string", sync_from);
+                    std::process::exit(1);
+                }
+            }
+        }
+    }
+
+    start_date
+}
+
 pub async fn import_balance_delta (app_state: AppState) {
 
+    if !CONFIG.tennet.balance_delta.enabled {
+        return;
+    }
+
     let latest_record = balance_delta::get_latest(&app_state.db_client).await;
-    let mut sync_from = 0;
+    let mut sync_from = get_start_sync_date();
 
     if let Some(latest) = latest_record {
         tracing::info!(
@@ -94,15 +125,15 @@ pub async fn import_balance_delta (app_state: AppState) {
         sync_from = latest.time_stamp + 60;
     } else {
         tracing::info!(
-            "Balance delta db empty, syncing from start of publication {:?}",
-            DateTime::from_timestamp(*FIRST_BALANCE_DATE, 0).unwrap()
+            "Balance delta db empty, syncing from start of publication or configured date {:?}",
+            DateTime::from_timestamp(sync_from, 0).unwrap()
         )
     }
 
     let files = match get_files_from_data_folder("balance_delta") {
         Ok(f) => f,
         Err(err) => {
-            tracing::error!("Failed to read high res balance delta data folder {:?}", err);
+            tracing::error!("Failed to read balance delta data folder {:?}", err);
             return;
         }
     };
@@ -196,10 +227,10 @@ async fn import_csv (app_state: &AppState, path: PathBuf, sync_from: i64) {
 pub async fn sync_balance_delta (app_state: &AppState) -> Vec<BalanceDeltaRecord> {
 
     let latest_record = balance_delta::get_latest(&app_state.db_client).await;
-    let mut sync_from = *FIRST_BALANCE_DATE;
+    let mut sync_from = get_start_sync_date();
 
     if let Some(latest) = latest_record {
-        sync_from = latest.time_stamp;
+        sync_from = i64::max(latest.time_stamp, sync_from);
     }
 
     let current_time_stamp = Utc::now().timestamp();
